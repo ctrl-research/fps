@@ -1,0 +1,12 @@
+[gd_scene load_steps=3 format=3 uid="uid://game_scene"]
+
+[ext_resource type="Script" path="res://addons/godot-multiplayer-weapon-system/scenes/game.gd" id="1"]
+[ext_resource type="Script" path="res://addons/godot-multiplayer-weapon-system/player/player_spawner.gd" id="2"]
+
+[node name="Game" type="Node3D"]
+script = ExtResource("1")
+
+[node name="PlayerSpawner" type="Node" parent="."]
+script = ExtResource("2")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
