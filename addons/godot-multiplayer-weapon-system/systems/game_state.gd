@@ -78,10 +78,6 @@ func _ready() -> void:
 	# Initialize team scores
 	team_scores[0] = 0
 	team_scores[1] = 0
-	
-	# Connect signals for multiplayer
-	multiplayer.peer_connected.connect(_on_peer_connected)
-	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 
 func _process(delta: float) -> void:
 	if current_round_state == RoundState.LIVE:
@@ -90,13 +86,18 @@ func _process(delta: float) -> void:
 			# Time ran out - defenders win
 			award_round_win(1)
 
-func _on_peer_connected(peer_id: int) -> void:
-	# Initialize player credits on connect
+## Called by MultiplayerManager when a peer joins
+func on_peer_joined(peer_id: int) -> void:
 	if not player_credits.has(peer_id):
 		player_credits[peer_id] = STARTING_CREDITS
 
-func _on_peer_disconnected(peer_id: int) -> void:
+## Called by MultiplayerManager when a peer leaves
+func on_peer_left(peer_id: int) -> void:
 	player_credits.erase(peer_id)
+
+## Called when disconnecting to clear all players
+func clear_all_players() -> void:
+	player_credits.clear()
 
 ## Start the buy phase for a new round
 func start_buy_phase() -> void:
