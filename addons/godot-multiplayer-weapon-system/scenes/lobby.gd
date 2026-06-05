@@ -58,12 +58,22 @@ func _on_join_pressed() -> void:
 
 func _on_disconnect_pressed() -> void:
 	MultiplayerManager.disconnect_session()
+	# Remove game scene and return to lobby
+	if has_node("/root/Game"):
+		get_node("/root/Game").queue_free()
 
 func _on_start_pressed() -> void:
-	# Host starts the round - transition to game scene
-	# This will be implemented when round state machine is built (issue #10)
+	# Only host transitions to game
+	if not MultiplayerManager.is_hosting():
+		return
 	GameState.start_buy_phase()
-	queue_free()  # Remove lobby, show game
+	_load_game_scene()
+
+func _load_game_scene() -> void:
+	var game_scene = load("res://addons/godot-multiplayer-weapon-system/scenes/game.tscn")
+	var game = game_scene.instantiate()
+	get_tree().root.add_child(game)
+	queue_free()  # Remove lobby
 
 func _on_connection_state_changed(state: MultiplayerManager.ConnectionState) -> void:
 	_update_ui(state)
