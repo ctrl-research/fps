@@ -75,7 +75,9 @@ func _ready() -> void:
 	sync_position = global_position
 
 func _input(event: InputEvent) -> void:
-	if not _mouse_captured:
+	# Only look around while the cursor is captured. Overlays such as the buy menu
+	# release the cursor, which must suppress camera look without spinning the view.
+	if Input.get_mouse_mode() != Input.MOUSE_MODE_CAPTURED:
 		return
 	if event is InputEventMouseMotion:
 		_yaw -= event.relative.x * MOUSE_SENSITIVITY

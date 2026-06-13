@@ -104,6 +104,7 @@ slide = {
 
 GameState="*res://addons/godot-multiplayer-weapon-system/systems/game_state.gd"
 WeaponDatabase="*res://addons/godot-multiplayer-weapon-system/resources/weapon_database.gd"
+PlayerLoadout="*res://addons/godot-multiplayer-weapon-system/systems/player_loadout.gd"
 ProjectSettings="*res://addons/godot-multiplayer-weapon-system/systems/project_settings.gd"
 MultiplayerManager="*res://addons/godot-multiplayer-weapon-system/systems/multiplayer_manager.gd"
 
