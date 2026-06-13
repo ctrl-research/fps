@@ -34,6 +34,10 @@ func get_weapon(weapon_id: String) -> Dictionary:
 func get_all_weapons() -> Array:
 	return _weapons.values()
 
+## Get all registered weapon ids
+func get_weapon_ids() -> Array:
+	return _weapons.keys()
+
 ## Register a new weapon
 func register_weapon(weapon_id: String, weapon_data: Dictionary) -> void:
 	_weapons[weapon_id] = weapon_data
@@ -52,6 +56,10 @@ func get_grenade(grenade_id: String) -> Dictionary:
 func get_all_grenades() -> Array:
 	return _grenades.values()
 
+## Get all registered grenade ids
+func get_grenade_ids() -> Array:
+	return _grenades.keys()
+
 ## Register a new grenade type
 func register_grenade(grenade_id: String, grenade_data: Dictionary) -> void:
 	_grenades[grenade_id] = grenade_data
@@ -64,6 +72,10 @@ func get_equipment(equipment_id: String) -> Dictionary:
 ## Get all registered equipment
 func get_all_equipment() -> Array:
 	return _equipment.values()
+
+## Get all registered equipment ids
+func get_equipment_ids() -> Array:
+	return _equipment.keys()
 
 ## Register a new equipment type
 func register_equipment(equipment_id: String, equipment_data: Dictionary) -> void:
