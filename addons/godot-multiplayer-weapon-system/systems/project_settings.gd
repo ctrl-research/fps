@@ -63,6 +63,18 @@ static func get_revive_time() -> float:
 static func get_rounds_to_win() -> int:
 	return get_setting("gameplay/match/rounds_to_win", 8)
 
+## WebRTC signaling broker URL (wss:// in production, behind a TLS proxy).
+## Override per build via the project setting network/signaling/url.
+static func get_signaling_url() -> String:
+	return get_setting("network/signaling/url", "ws://localhost:9080")
+
+## ICE servers for WebRTC connections. STUN is free/public; add a TURN entry here
+## (with credentials) if friends on strict/symmetric NATs can't connect.
+static func get_ice_servers() -> Array:
+	return get_setting("network/signaling/ice_servers", [
+		{"urls": ["stun:stun.l.google.com:19302"]},
+	])
+
 static func setup_gameplay_settings() -> void:
 	"""
 	Initialize default gameplay settings if not already present.
@@ -84,5 +96,9 @@ static func setup_gameplay_settings() -> void:
 		ProjectSettings.set_setting("gameplay/grenade/push_radius", 3.0)
 		ProjectSettings.set_setting("network/lobby/port", DEFAULT_NETWORK_PORT)
 		ProjectSettings.set_setting("network/lobby/max_players", DEFAULT_MAX_PLAYERS)
-		
+		ProjectSettings.set_setting("network/signaling/url", "ws://localhost:9080")
+		ProjectSettings.set_setting("network/signaling/ice_servers", [
+			{"urls": ["stun:stun.l.google.com:19302"]},
+		])
+
 		ProjectSettings.save()
