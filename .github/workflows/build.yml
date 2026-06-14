@@ -8,15 +8,16 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 env:
   GODOT_VERSION: "4.6.3"
-  EXPORT_PRESET: "Windows Desktop"
   EXPORT_NAME: "fps"
 
 jobs:
-  windows:
-    name: Windows (x86_64)
+  build:
+    name: Export (Windows + Web)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -47,22 +48,49 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build/windows
-          ./godot --headless --path . --export-release "${EXPORT_PRESET}" "build/windows/${EXPORT_NAME}.exe"
+          ./godot --headless --path . --export-release "Windows Desktop" "build/windows/${EXPORT_NAME}.exe"
           test -f "build/windows/${EXPORT_NAME}.exe"
 
-      - name: Archive build
+      - name: Export Web build
         run: |
-          cd build/windows
-          zip -r "../../${EXPORT_NAME}-windows.zip" .
+          set -euo pipefail
+          mkdir -p build/web
+          ./godot --headless --path . --export-release "Web" "build/web/index.html"
+          test -f "build/web/index.html"
+
+      - name: Archive builds
+        run: |
+          set -euo pipefail
+          (cd build/windows && zip -r "../../${EXPORT_NAME}-windows.zip" .)
+          (cd build/web && zip -r "../../${EXPORT_NAME}-web.zip" .)
 
       - name: Publish to GitHub Releases (rolling latest)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Roll the "latest" release forward to this commit's build.
+          # Roll the "latest" release forward to this commit's builds.
           gh release delete latest --yes --cleanup-tag 2>/dev/null || true
-          gh release create latest "${EXPORT_NAME}-windows.zip" \
+          gh release create latest \
+            "${EXPORT_NAME}-windows.zip" \
+            "${EXPORT_NAME}-web.zip" \
             --title "Latest main build" \
-            --notes "Automated Windows build from ${GITHUB_SHA}." \
+            --notes "Automated build from ${GITHUB_SHA}." \
             --target "${GITHUB_SHA}" \
             --prerelease
+
+      - name: Upload Pages artifact (web build)
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy-pages:
+    name: Deploy Web to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
