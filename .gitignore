@@ -24,6 +24,9 @@ vendor/
 # Godot
 .godot/
 
+# Fetched WebRTC GDExtension binaries (populated by scripts/fetch_webrtc.sh)
+/addons/webrtc/
+
 # Build outputs
 dist/
 build/

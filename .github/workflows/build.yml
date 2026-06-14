@@ -41,6 +41,9 @@ jobs:
           mkdir -p "$template_dir"
           mv templates/* "$template_dir/"
 
+      - name: Fetch WebRTC extension (desktop online support; best-effort)
+        run: bash scripts/fetch_webrtc.sh
+
       - name: Import project
         run: ./godot --headless --path . --import
 
