@@ -1,0 +1,68 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  GODOT_VERSION: "4.6.3"
+  EXPORT_PRESET: "Windows Desktop"
+  EXPORT_NAME: "fps"
+
+jobs:
+  windows:
+    name: Windows (x86_64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Godot and export templates
+        run: |
+          set -euo pipefail
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          curl -fL -o godot.zip "$base/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          curl -fL -o templates.tpz "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+
+          unzip -q godot.zip
+          mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot
+          chmod +x godot
+
+          # Templates extract into a "templates/" directory and must live under
+          # the version-specific export_templates path Godot looks them up in.
+          unzip -q templates.tpz
+          template_dir="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$template_dir"
+          mv templates/* "$template_dir/"
+
+      - name: Import project
+        run: ./godot --headless --path . --import
+
+      - name: Export Windows build
+        run: |
+          set -euo pipefail
+          mkdir -p build/windows
+          ./godot --headless --path . --export-release "${EXPORT_PRESET}" "build/windows/${EXPORT_NAME}.exe"
+          test -f "build/windows/${EXPORT_NAME}.exe"
+
+      - name: Archive build
+        run: |
+          cd build/windows
+          zip -r "../../${EXPORT_NAME}-windows.zip" .
+
+      - name: Publish to GitHub Releases (rolling latest)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Roll the "latest" release forward to this commit's build.
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create latest "${EXPORT_NAME}-windows.zip" \
+            --title "Latest main build" \
+            --notes "Automated Windows build from ${GITHUB_SHA}." \
+            --target "${GITHUB_SHA}" \
+            --prerelease
