@@ -1,8 +1,11 @@
 extends Node
 class_name MultiplayerManager
 """
-Autoload singleton for ENet multiplayer peer management.
+Autoload singleton for WebSocket multiplayer peer management.
 Handles host/server creation, client connections, and peer lifecycle.
+
+WebSocket transport is used (rather than ENet/UDP) so that browser clients can
+connect: browsers cannot open raw UDP sockets, but they can open WebSockets.
 """
 
 ## Emitted when connection state changes
@@ -33,8 +36,8 @@ var current_state: ConnectionState = ConnectionState.DISCONNECTED:
 			current_state = value
 			connection_state_changed.emit(value)
 
-var server_peer: ENetMultiplayerPeer = null
-var ui_peer: ENetMultiplayerPeer = null
+var server_peer: WebSocketMultiplayerPeer = null
+var ui_peer: WebSocketMultiplayerPeer = null
 
 func _ready() -> void:
 	# Ensure multiplayer singleton exists
@@ -50,8 +53,10 @@ func start_host(port: int = DEFAULT_PORT) -> Error:
 	if current_state != ConnectionState.DISCONNECTED:
 		return ERR_ALREADY_EXISTS
 
-	server_peer = ENetMultiplayerPeer.new()
-	var create_result = server_peer.create_server(port, MAX_PLAYERS)
+	server_peer = WebSocketMultiplayerPeer.new()
+	# WebSocketMultiplayerPeer has no max-player argument; the cap is enforced
+	# on connect in _on_mp_peer_connected.
+	var create_result = server_peer.create_server(port)
 	if create_result != OK:
 		server_peer = null
 		return create_result
@@ -69,8 +74,11 @@ func join_server(ip: String, port: int = DEFAULT_PORT) -> Error:
 	if current_state != ConnectionState.DISCONNECTED:
 		return ERR_ALREADY_EXISTS
 
-	ui_peer = ENetMultiplayerPeer.new()
-	var create_result = ui_peer.create_client(ip, port)
+	ui_peer = WebSocketMultiplayerPeer.new()
+	# WebSocket clients connect to a URL. Accept either a bare host/IP or a
+	# pre-formed ws:// URL.
+	var url := ip if ip.begins_with("ws://") or ip.begins_with("wss://") else "ws://%s:%d" % [ip, port]
+	var create_result = ui_peer.create_client(url)
 	if create_result != OK:
 		ui_peer = null
 		return create_result
@@ -108,14 +116,13 @@ func is_connected() -> bool:
 	return current_state == ConnectionState.CONNECTED or current_state == ConnectionState.HOSTING
 
 
-## Get list of all connected peer IDs (excludes 0 = server)
+## Get list of all connected peer IDs (excludes self)
 func get_connected_peers() -> Array[int]:
+	# High-level API: transport-agnostic and already excludes our own id.
 	var peers: Array[int] = []
-	if server_peer != null:
-		var peer_list = server_peer.get_peer_list()
-		for p in peer_list:
-			if p != 1:  # Exclude self (host peer_id 1)
-				peers.append(p)
+	if multiplayer.multiplayer_peer != null:
+		for p in multiplayer.get_peers():
+			peers.append(p)
 	return peers
 
 
@@ -123,18 +130,21 @@ func get_connected_peers() -> Array[int]:
 func get_peer_info(peer_id: int) -> Dictionary:
 	if not multiplayer.has_peer(peer_id):
 		return {}
-	var info = multiplayer.get_peer(peer_id)
 	return {
 		"peer_id": peer_id,
-		"ip": info.get("remote_ip", "") if info else "",
-		"port": info.get("remote_port", 0) if info else 0,
-		"connected_time": 0  # Could track this if needed
+		"connected": true,
 	}
 
 
 # === Private callbacks ===
 
 func _on_mp_peer_connected(peer_id: int) -> void:
+	# Enforce the player cap on the host, since WebSocket can't pre-limit at
+	# create_server time. get_peers() already includes the new peer.
+	if is_hosting() and multiplayer.get_peers().size() > MAX_PLAYERS:
+		server_peer.disconnect_peer(peer_id)
+		return
+
 	peer_connected.emit(peer_id)
 	# Initialize player in game state
 	GameState.on_peer_joined(peer_id)
