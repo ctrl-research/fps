@@ -8,6 +8,7 @@ Shown at startup and when disconnected. Manages connection state display.
 @onready var host_button: Button = $MenuPanel/Margin/VBox/HostButton
 @onready var ip_input: LineEdit = $MenuPanel/Margin/VBox/JoinSection/IPInput
 @onready var join_button: Button = $MenuPanel/Margin/VBox/JoinSection/JoinButton
+@onready var tutorial_button: Button = $MenuPanel/Margin/VBox/TutorialButton
 @onready var disconnect_button: Button = $MenuPanel/Margin/VBox/DisconnectButton
 @onready var player_list_label: Label = $MenuPanel/Margin/VBox/PlayerListLabel
 @onready var player_list: VBoxContainer = $MenuPanel/Margin/VBox/PlayerList
@@ -19,6 +20,7 @@ func _ready() -> void:
 	# Connect button signals
 	host_button.pressed.connect(_on_host_pressed)
 	join_button.pressed.connect(_on_join_pressed)
+	tutorial_button.pressed.connect(_on_tutorial_pressed)
 	disconnect_button.pressed.connect(_on_disconnect_pressed)
 	start_button.pressed.connect(_on_start_pressed)
 
@@ -56,6 +58,10 @@ func _on_join_pressed() -> void:
 	status_label.text = "Connecting to %s..." % ip
 	_set_buttons_connected(true)
 
+func _on_tutorial_pressed() -> void:
+	# Offline practice range — no multiplayer session required.
+	get_tree().change_scene_to_file("res://addons/godot-multiplayer-weapon-system/scenes/tutorial.tscn")
+
 func _on_disconnect_pressed() -> void:
 	MultiplayerManager.disconnect_session()
 	# Remove game scene and return to lobby
@@ -85,6 +91,8 @@ func _on_peer_disconnected(peer_id: int) -> void:
 	_refresh_player_list()
 
 func _update_ui(state: MultiplayerManager.ConnectionState) -> void:
+	# Offline practice is only offered when not in a session.
+	tutorial_button.visible = state == MultiplayerManager.ConnectionState.DISCONNECTED
 	match state:
 		case MultiplayerManager.ConnectionState.DISCONNECTED:
 			status_label.text = "Disconnected"
