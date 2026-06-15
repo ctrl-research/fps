@@ -68,6 +68,35 @@ layout_mode = 2
 text = "Tutorial / Practice Range"
 maximum_size = Vector2(300, 0)
 
+[node name="OnlineSeparator" type="HSeparator" parent="MenuPanel/Margin/VBox"]
+layout_mode = 2
+
+[node name="HostOnlineButton" type="Button" parent="MenuPanel/Margin/VBox"]
+layout_mode = 2
+text = "Host Online"
+maximum_size = Vector2(300, 0)
+
+[node name="JoinOnlineSection" type="HBoxContainer" parent="MenuPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="RoomCodeInput" type="LineEdit" parent="MenuPanel/Margin/VBox/JoinOnlineSection"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Room code"
+max_length = 8
+
+[node name="JoinOnlineButton" type="Button" parent="MenuPanel/Margin/VBox/JoinOnlineSection"]
+layout_mode = 2
+text = "Join Online"
+
+[node name="RoomCodeLabel" type="Label" parent="MenuPanel/Margin/VBox"]
+layout_mode = 2
+text = ""
+horizontal_alignment = 1
+visible = false
+theme_override_colors/font_color = Color(0.85, 1, 0.7, 1)
+
 [node name="DisconnectButton" type="Button" parent="MenuPanel/Margin/VBox"]
 layout_mode = 2
 text = "Disconnect"
