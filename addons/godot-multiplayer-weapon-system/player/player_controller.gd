@@ -11,8 +11,14 @@ FPS player controller. Handles local movement, camera, and networking.
 ## Emitted when health reaches 0
 signal died()
 
+## Emitted when this body's health changes (current, maximum)
+signal health_changed(current: float, maximum: float)
+
 ## Multiplayer authority ID for this body (0 = server/authority)
 @export var authority_peer_id: int = 1
+
+## Maximum health
+@export var max_health: float = 100.0
 
 # === Movement constants ===
 const WALK_SPEED: float = 6.0
@@ -54,16 +60,33 @@ var _mouse_captured: bool = false
 var _yaw: float = 0.0
 var _pitch: float = 0.0
 
+# === Combat ===
+var health: float = 100.0
+var is_dead: bool = false
+var _weapon_controller: WeaponController = null
+
 func _ready() -> void:
+	health = max_health
+
 	# Set up camera
 	_camera = Camera3D.new()
 	_camera.name = "Camera"
 	_camera.fov = 90.0
 	add_child(_camera)
 
+	var is_local := multiplayer.has_multiplayer_authority()
+	_camera.current = is_local
+
+	# Weapon handling exists on every body: the local one reads input, remote
+	# ones replay fire effects received over RPC.
+	_weapon_controller = WeaponController.new()
+	_weapon_controller.name = "WeaponController"
+	add_child(_weapon_controller)
+	_weapon_controller.setup(self, _camera, is_local)
+
 	# Only process locally for this player
 	# Remote players are set by set_multiplayer_authority externally
-	if multiplayer.has_multiplayer_authority():
+	if is_local:
 		set_process_input(true)
 		set_process(true)
 		_capture_mouse()
@@ -211,3 +234,56 @@ func spawn_at(pos: Vector3) -> void:
 	global_position = pos
 	if multiplayer.has_multiplayer_authority():
 		_capture_mouse()
+
+# === Combat ===
+
+## Add recoil to the player's aim. Positive pitch kicks the view up. Called by
+## the WeaponController so recoil moves the actual aim (CS-style), not just a
+## cosmetic camera shake the movement code would overwrite each frame.
+func add_look_recoil(pitch_delta: float, yaw_delta: float) -> void:
+	_pitch += pitch_delta
+	_yaw += yaw_delta
+
+## Entry point for attackers. Routes the damage to this body's authority, which
+## applies it and broadcasts the new health to everyone else.
+func request_damage(amount: float, attacker_id: int) -> void:
+	if multiplayer.multiplayer_peer == null or is_multiplayer_authority():
+		_apply_damage(amount, attacker_id)
+	else:
+		_receive_damage.rpc_id(get_multiplayer_authority(), amount, attacker_id)
+
+@rpc("any_peer", "reliable")
+func _receive_damage(amount: float, attacker_id: int) -> void:
+	if not is_multiplayer_authority():
+		return
+	_apply_damage(amount, attacker_id)
+
+## Authority-side damage application followed by a health broadcast.
+func _apply_damage(amount: float, attacker_id: int) -> void:
+	if is_dead or amount <= 0.0:
+		return
+	health = max(health - amount, 0.0)
+	health_changed.emit(health, max_health)
+	_broadcast_health()
+	if health <= 0.0:
+		_die(attacker_id)
+
+func _broadcast_health() -> void:
+	if multiplayer.multiplayer_peer == null:
+		return
+	_sync_health.rpc(health, is_dead)
+
+@rpc("authority", "call_remote", "reliable")
+func _sync_health(current: float, dead: bool) -> void:
+	health = current
+	health_changed.emit(health, max_health)
+	if dead and not is_dead:
+		is_dead = true
+		died.emit()
+
+func _die(_attacker_id: int) -> void:
+	if is_dead:
+		return
+	is_dead = true
+	died.emit()
+	_broadcast_health()
