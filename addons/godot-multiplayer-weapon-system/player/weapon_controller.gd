@@ -50,7 +50,7 @@ var _is_local: bool = false
 
 # [slot] = Weapon, where slot is "primary" or "secondary"
 var _slots: Dictionary = {}
-var _active_slot: String = "secondary"
+var _active_slot: String = "primary"
 
 var _cooldown: float = 0.0
 var _spray_index: int = 0
@@ -216,8 +216,9 @@ func _fire_hitscan(weapon: Weapon) -> void:
 		if hit.is_empty():
 			continue
 		var collider = hit.get("collider")
-		if collider is PlayerController:
-			(collider as PlayerController).request_damage(weapon.damage(), _peer_id())
+		# Any body exposing request_damage is damageable (players, dummies, …).
+		if collider and collider.has_method("request_damage"):
+			collider.request_damage(weapon.damage(), _peer_id())
 
 func _fire_projectile(weapon: Weapon) -> void:
 	if _camera == null:
@@ -379,7 +380,8 @@ func _build_gunshot_stream() -> AudioStreamWAV:
 # === HUD ===
 
 func _build_hud() -> void:
-	var hud := CanvasLayer.new()
+	# Untyped so the dynamically-attached HUD script's bind() resolves at runtime.
+	var hud = CanvasLayer.new()
 	hud.name = "WeaponHud"
 	hud.set_script(load(HUD_SCRIPT))
 	add_child(hud)

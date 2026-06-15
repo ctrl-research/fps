@@ -165,8 +165,13 @@ func _handle_movement(delta: float) -> void:
 		if Input.is_action_just_pressed("jump"):
 			_velocity_y = JUMP_VELOCITY
 
-	# Build velocity
-	var velocity := input_dir * _current_speed
+	# Build velocity from input rotated into the body's facing direction.
+	# Assigns the inherited CharacterBody3D.velocity that move_and_slide() reads.
+	var direction := Basis(Vector3.UP, _yaw) * input_dir
+	if direction.length() > 1.0:
+		direction = direction.normalized()
+	velocity.x = direction.x * _current_speed
+	velocity.z = direction.z * _current_speed
 	velocity.y = _velocity_y
 
 	# Apply movement
@@ -200,16 +205,18 @@ func _begin_slide(direction: Vector3) -> void:
 	_is_sliding = true
 	_slide_timer = SLIDE_DURATION
 	_slide_cooldown_timer = SLIDE_COOLDOWN
-	_slide_direction = direction
+	# Lock the slide direction in world space so it doesn't steer with the camera.
+	_slide_direction = (Basis(Vector3.UP, _yaw) * direction).normalized()
 	_is_crouching = false
 	_crouch_height_current = CROUCH_HEIGHT
 	_current_speed = SLIDE_SPEED
 
-func _move_slide(delta: float) -> void:
-	var velocity := _slide_direction * SLIDE_SPEED
+func _move_slide(_delta: float) -> void:
+	# _slide_direction is stored in world space at slide start.
+	velocity.x = _slide_direction.x * SLIDE_SPEED
+	velocity.z = _slide_direction.z * SLIDE_SPEED
 	velocity.y = _velocity_y
 	move_and_slide()
-	_velocity_y = velocity.y
 
 func _end_slide() -> void:
 	_is_sliding = false
@@ -244,36 +251,44 @@ func add_look_recoil(pitch_delta: float, yaw_delta: float) -> void:
 	_pitch += pitch_delta
 	_yaw += yaw_delta
 
-## Entry point for attackers. Routes the damage to this body's authority, which
-## applies it and broadcasts the new health to everyone else.
+## Entry point for attackers (called on the attacker's own machine). Routes the
+## damage to the body's owning peer, which is the single writer for its health
+## per the "each client is authoritative for its own body" model. The owner
+## applies the damage and broadcasts the resulting health to everyone.
 func request_damage(amount: float, attacker_id: int) -> void:
-	if multiplayer.multiplayer_peer == null or is_multiplayer_authority():
+	if multiplayer.multiplayer_peer == null or authority_peer_id == _local_peer():
 		_apply_damage(amount, attacker_id)
 	else:
-		_receive_damage.rpc_id(get_multiplayer_authority(), amount, attacker_id)
+		_receive_damage.rpc_id(authority_peer_id, amount, attacker_id)
 
 @rpc("any_peer", "reliable")
 func _receive_damage(amount: float, attacker_id: int) -> void:
-	if not is_multiplayer_authority():
+	# Only the owning peer applies damage to this body; ignore stray routing.
+	if authority_peer_id != _local_peer():
 		return
 	_apply_damage(amount, attacker_id)
 
-## Authority-side damage application followed by a health broadcast.
-func _apply_damage(amount: float, attacker_id: int) -> void:
+## Owner-side damage application followed by a health broadcast.
+func _apply_damage(amount: float, _attacker_id: int) -> void:
 	if is_dead or amount <= 0.0:
 		return
 	health = max(health - amount, 0.0)
+	if health <= 0.0:
+		is_dead = true
 	health_changed.emit(health, max_health)
 	_broadcast_health()
-	if health <= 0.0:
-		_die(attacker_id)
+	if is_dead:
+		died.emit()
 
 func _broadcast_health() -> void:
 	if multiplayer.multiplayer_peer == null:
 		return
 	_sync_health.rpc(health, is_dead)
 
-@rpc("authority", "call_remote", "reliable")
+## Display-only health sync pushed by the owning peer. Permissive sender because
+## node multiplayer authority is not set consistently across peers in this
+## project; the owner is the sole authoritative writer by convention.
+@rpc("any_peer", "call_remote", "reliable")
 func _sync_health(current: float, dead: bool) -> void:
 	health = current
 	health_changed.emit(health, max_health)
@@ -281,9 +296,8 @@ func _sync_health(current: float, dead: bool) -> void:
 		is_dead = true
 		died.emit()
 
-func _die(_attacker_id: int) -> void:
-	if is_dead:
-		return
-	is_dead = true
-	died.emit()
-	_broadcast_health()
+## The local peer's id (1 when running without an active network peer).
+func _local_peer() -> int:
+	if multiplayer.multiplayer_peer == null:
+		return 1
+	return multiplayer.get_unique_id()

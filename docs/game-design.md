@@ -110,6 +110,56 @@ When a player's health reaches 0, they enter the **Downed State**:
 - Equipment resets each round
 - Weapons persist until destroyed or sold
 
+### 5. Weapon System
+
+Firing, hit detection, and damage are driven by the per-player `WeaponController`
+(`player/weapon_controller.gd`). All stats are read live from the
+`WeaponDatabase`, which stays the single source of truth.
+
+**Weapon classes & stats** (from `resources/weapon_database.gd`):
+
+| Class | Examples | Damage | Fire rate (s) | Mag | Reserve | Spread | Recoil |
+|-------|----------|--------|---------------|-----|---------|--------|--------|
+| Assault Rifle | AR-15, AK-74 | 30–35 | 0.10–0.12 | 30 | 75–90 | 0.03–0.04 | 0.15–0.20 |
+| SMG | MP5, Vector | 20–22 | 0.05–0.06 | 30–50 | 120–150 | 0.04–0.05 | 0.08–0.10 |
+| Shotgun | M870, AA-12 | 50–80 | 0.30–0.80 | 8–20 | 24–60 | 0.15–0.18 | 0.35–0.40 |
+| Sniper | AWP, MSG90 | 85–115 | 0.50–1.20 | 10 | 30–40 | 0.01–0.02 | 0.35–0.60 |
+| Pistol | Glock 17, Deagle | 18–35 | 0.15–0.40 | 7–17 | 28–51 | 0.02–0.03 | 0.03–0.12 |
+
+**Equip / switch:** primary and secondary slots are filled from the player's
+`PlayerLoadout`. Press **1** (primary) / **2** (secondary) to switch.
+
+**Firing:**
+- **Hitscan** (default) — a raycast from the camera centre. Shotguns fire
+  multiple pellets (`pellets`, default 8), each its own raycast.
+- **Projectile** — a travelling `Area3D` (`player/projectile.tscn`), used when a
+  weapon defines `"fire_mode": "projectile"` (with optional `projectile_speed`).
+
+**Hit detection & damage:** a hit on a `PlayerController` routes damage to that
+body's owning peer, which applies it and broadcasts the resulting health.
+Reaching 0 health emits `died`.
+
+**Accuracy:** the effective spread cone combines the weapon's base spread, a
+movement penalty (scaled by horizontal speed), and a spray buildup. Recoil kicks
+the aim upward in a decelerating, CS-style climb with slight horizontal sway, and
+recovers when the trigger is released.
+
+**Ammo & reload:** each weapon tracks current magazine and reserve ammo. Press
+**R** to reload; reload time defaults per class (pistol 1.5s → sniper 3.5s) and
+can be overridden per weapon with a `"reload_time"` key.
+
+**Feedback:** every shot plays a muzzle flash (mesh + light) and a procedural
+gunshot, mirrored to other clients. A dynamic HUD crosshair widens with the
+current spread, alongside a weapon/ammo/reload readout.
+
+**Controls:**
+
+| Action | Bind |
+|--------|------|
+| Fire | Left Mouse (held for automatic AR/SMG, tap for semi-auto) |
+| Reload | R |
+| Equip primary / secondary | 1 / 2 |
+
 ---
 
 ## Round Flow & Buy Phase

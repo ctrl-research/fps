@@ -45,6 +45,7 @@ func _physics_process(delta: float) -> void:
 func _on_body_entered(body: Node) -> void:
 	if body == shooter:
 		return
-	if body is PlayerController:
-		(body as PlayerController).request_damage(damage, attacker_id)
+	# Any body exposing request_damage is damageable (players, dummies, …).
+	if body.has_method("request_damage"):
+		body.request_damage(damage, attacker_id)
 	queue_free()
