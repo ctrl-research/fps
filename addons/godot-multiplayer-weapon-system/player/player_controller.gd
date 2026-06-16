@@ -149,6 +149,17 @@ func _input(event: InputEvent) -> void:
 		_pitch -= event.relative.y * MOUSE_SENSITIVITY
 		_pitch = clamp(_pitch, -MOUSE_VERTICAL_LIMIT, MOUSE_VERTICAL_LIMIT)
 
+func _unhandled_input(event: InputEvent) -> void:
+	# Browsers only grant pointer lock (MOUSE_MODE_CAPTURED) from a user gesture,
+	# so re-capture on click. Clicks over an open menu are consumed by the menu's
+	# UI (its full-screen dimmer) and never reach here, so this won't fire while
+	# shopping.
+	if not is_multiplayer_authority() or is_dead:
+		return
+	if event is InputEventMouseButton and event.pressed:
+		if Input.get_mouse_mode() != Input.MOUSE_MODE_CAPTURED:
+			_capture_mouse()
+
 func _process(delta: float) -> void:
 	if is_multiplayer_authority():
 		_send_sync_data()
