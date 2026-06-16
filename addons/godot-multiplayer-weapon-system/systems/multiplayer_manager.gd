@@ -272,8 +272,9 @@ func is_hosting() -> bool:
 	return current_state == ConnectionState.HOSTING
 
 
-## Check if currently connected (as client or host)
-func is_connected() -> bool:
+## Check if currently connected (as client or host).
+## Not named is_connected(): that would illegally override Node.is_connected().
+func is_session_connected() -> bool:
 	return current_state == ConnectionState.CONNECTED or current_state == ConnectionState.HOSTING
 
 

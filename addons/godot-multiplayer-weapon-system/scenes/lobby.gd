@@ -164,7 +164,7 @@ func _update_ui(state: int) -> void:
 	# Offline practice is only offered when not in a session.
 	tutorial_button.visible = state == MultiplayerManager.ConnectionState.DISCONNECTED
 	match state:
-		case MultiplayerManager.ConnectionState.DISCONNECTED:
+		MultiplayerManager.ConnectionState.DISCONNECTED:
 			status_label.text = "Disconnected"
 			_show_connect_controls(true)
 			ip_input.text = ""
@@ -186,7 +186,7 @@ func _update_ui(state: int) -> void:
 			player_list.visible = false
 			start_button.visible = false
 			room_code_label.visible = false
-		case MultiplayerManager.ConnectionState.HOSTING:
+		MultiplayerManager.ConnectionState.HOSTING:
 			if MultiplayerManager.current_room_code != "":
 				status_label.text = "Hosting online"
 				room_code_label.visible = true
@@ -199,10 +199,10 @@ func _update_ui(state: int) -> void:
 			player_list.visible = true
 			start_button.visible = true
 			_refresh_player_list()
-		case MultiplayerManager.ConnectionState.CONNECTING:
+		MultiplayerManager.ConnectionState.CONNECTING:
 			status_label.text = "Connecting..."
 			_set_buttons_connected(true)
-		case MultiplayerManager.ConnectionState.CONNECTED:
+		MultiplayerManager.ConnectionState.CONNECTED:
 			status_label.text = "Connected"
 			_show_connect_controls(false)
 			room_code_label.visible = false
