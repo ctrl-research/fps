@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -44,30 +45,43 @@ jobs:
       - name: Fetch WebRTC extension (desktop online support; best-effort)
         run: bash scripts/fetch_webrtc.sh
 
+      # Tee Godot output to build.log so the verify step below can fail the run
+      # on parse/autoload errors — a Godot export exits 0 even when scripts fail
+      # to compile, so success alone does not mean the project is healthy.
       - name: Import project
-        run: ./godot --headless --path . --import
+        run: ./godot --headless --path . --import 2>&1 | tee -a build.log
 
       - name: Export Windows build
         run: |
           set -euo pipefail
           mkdir -p build/windows
-          ./godot --headless --path . --export-release "Windows Desktop" "build/windows/${EXPORT_NAME}.exe"
+          ./godot --headless --path . --export-release "Windows Desktop" "build/windows/${EXPORT_NAME}.exe" 2>&1 | tee -a build.log
           test -f "build/windows/${EXPORT_NAME}.exe"
 
       - name: Export Web build
         run: |
           set -euo pipefail
           mkdir -p build/web
-          ./godot --headless --path . --export-release "Web" "build/web/index.html"
+          ./godot --headless --path . --export-release "Web" "build/web/index.html" 2>&1 | tee -a build.log
           test -f "build/web/index.html"
 
+      - name: Verify no GDScript parse / autoload errors
+        run: |
+          if grep -nE "SCRIPT ERROR|Parse Error|Failed to load script|Failed to create an autoload|does not inherit from" build.log; then
+            echo "::error::GDScript parse or autoload errors detected during export (see matches above)."
+            exit 1
+          fi
+          echo "No GDScript parse/autoload errors detected."
+
       - name: Archive builds
+        if: github.ref == 'refs/heads/main'
         run: |
           set -euo pipefail
           (cd build/windows && zip -r "../../${EXPORT_NAME}-windows.zip" .)
           (cd build/web && zip -r "../../${EXPORT_NAME}-web.zip" .)
 
       - name: Publish to GitHub Releases (rolling latest)
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -82,6 +96,7 @@ jobs:
             --prerelease
 
       - name: Upload Pages artifact (web build)
+        if: github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
         with:
           path: build/web
@@ -89,8 +104,8 @@ jobs:
   deploy-pages:
     name: Deploy Web to GitHub Pages
     needs: build
-    # Only publish to production Pages from main; branch dispatches build+export
-    # for validation without deploying.
+    # Only publish to production Pages from main; PRs build+export for validation
+    # without deploying.
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
