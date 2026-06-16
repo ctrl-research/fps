@@ -31,6 +31,10 @@ const GRAVITY: float = 20.0
 const MOUSE_SENSITIVITY: float = 0.003
 const MOUSE_VERTICAL_LIMIT: float = 89.0
 
+# Visual layer 20: the owner's own body. Hidden from their own first-person
+# camera (so it never blocks the view) but rendered by mirrors and other players.
+const OWN_BODY_VISUAL_LAYER: int = 1 << 19
+
 # === Crouch/Stand ===
 const CROUCH_TRANSITION_SPEED: float = 8.0
 const STAND_HEIGHT: float = 1.8
@@ -84,6 +88,8 @@ func _ready() -> void:
 	add_child(_weapon_controller)
 	_weapon_controller.setup(self, _camera, is_local)
 
+	_build_body_mesh(is_local)
+
 	# Only process locally for this player
 	# Remote players are set by set_multiplayer_authority externally
 	if is_local:
@@ -96,6 +102,42 @@ func _ready() -> void:
 
 	# Sync initial position
 	sync_position = global_position
+
+## Build a simple visible body (torso + head) so the player is seen by mirrors
+## and other players. For the local player it is moved to a dedicated visual
+## layer that its own camera culls, so it never obstructs the first-person view.
+func _build_body_mesh(is_local: bool) -> void:
+	var skin := StandardMaterial3D.new()
+	skin.albedo_color = Color(0.25, 0.5, 0.85)
+	skin.metallic = 0.1
+	skin.roughness = 0.7
+
+	var body := Node3D.new()
+	body.name = "BodyModel"
+	add_child(body)
+
+	var torso := MeshInstance3D.new()
+	var torso_mesh := CapsuleMesh.new()
+	torso_mesh.radius = 0.28
+	torso_mesh.height = 1.4
+	torso.mesh = torso_mesh
+	torso.material_override = skin
+	torso.position = Vector3(0.0, 0.8, 0.0)
+	body.add_child(torso)
+
+	var head := MeshInstance3D.new()
+	var head_mesh := SphereMesh.new()
+	head_mesh.radius = 0.2
+	head_mesh.height = 0.4
+	head.mesh = head_mesh
+	head.material_override = skin
+	head.position = Vector3(0.0, 1.65, 0.0)
+	body.add_child(head)
+
+	if is_local:
+		torso.layers = OWN_BODY_VISUAL_LAYER
+		head.layers = OWN_BODY_VISUAL_LAYER
+		_camera.cull_mask &= ~OWN_BODY_VISUAL_LAYER
 
 func _input(event: InputEvent) -> void:
 	# Only look around while the cursor is captured. Overlays such as the buy menu

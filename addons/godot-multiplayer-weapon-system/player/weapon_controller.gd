@@ -64,6 +64,7 @@ var _flash_mesh: MeshInstance3D = null
 var _flash_light: OmniLight3D = null
 var _audio: AudioStreamPlayer3D = null
 var _flash_timer: float = 0.0
+var _viewmodel: Node3D = null
 
 ## Wire the controller to its body and camera. Builds effect nodes, the local
 ## HUD, and the initial loadout. Called by PlayerController after add_child.
@@ -148,6 +149,7 @@ func refresh_loadout() -> void:
 	if weapon:
 		weapon_changed.emit(weapon)
 		ammo_changed.emit(weapon.mag, weapon.reserve)
+		_update_viewmodel(weapon)
 
 func _sync_slot(slot: String, weapon_id: String) -> void:
 	if weapon_id == "":
@@ -171,6 +173,7 @@ func _switch_to(slot: String) -> void:
 	_spray_index = 0
 	weapon_changed.emit(weapon)
 	ammo_changed.emit(weapon.mag, weapon.reserve)
+	_update_viewmodel(weapon)
 
 func _active() -> Weapon:
 	return _slots.get(_active_slot)
@@ -306,6 +309,8 @@ func _build_effects() -> void:
 	else:
 		add_child(_muzzle)
 
+	_build_viewmodel()
+
 	var flash_material := StandardMaterial3D.new()
 	flash_material.emission_enabled = true
 	flash_material.emission = Color(1.0, 0.85, 0.4)
@@ -332,6 +337,84 @@ func _build_effects() -> void:
 	_audio.stream = _build_gunshot_stream()
 	_audio.unit_size = 8.0
 	_muzzle.add_child(_audio)
+
+# === Weapon view model ===
+
+## Container for the held-weapon mesh, sitting in front of the camera.
+func _build_viewmodel() -> void:
+	_viewmodel = Node3D.new()
+	_viewmodel.name = "ViewModel"
+	_viewmodel.position = Vector3(0.25, -0.22, -0.45)
+	if _camera:
+		_camera.add_child(_viewmodel)
+	else:
+		add_child(_viewmodel)
+
+## Rebuild a simple blocky gun model sized to the active weapon's class.
+func _update_viewmodel(weapon: Weapon) -> void:
+	if _viewmodel == null:
+		return
+	for child in _viewmodel.get_children():
+		child.queue_free()
+
+	var color := _viewmodel_color(weapon.type())
+	var barrel_len := _barrel_length(weapon.type())
+
+	# Receiver (main body), barrel, and grip — a recognisable gun silhouette.
+	_add_gun_part(Vector3(0.07, 0.1, 0.32), Vector3(0.0, 0.0, 0.0), color)
+	_add_gun_part(Vector3(0.035, 0.035, barrel_len), Vector3(0.0, 0.015, -0.16 - barrel_len * 0.5), color)
+	_add_gun_part(Vector3(0.06, 0.14, 0.06), Vector3(0.0, -0.11, 0.1), color)
+
+	match weapon.type():
+		"sniper":
+			# Scope on top.
+			_add_gun_part(Vector3(0.04, 0.04, 0.18), Vector3(0.0, 0.09, 0.0), Color(0.05, 0.05, 0.06))
+		"smg", "assault_rifle", "shotgun":
+			# Magazine below the receiver.
+			_add_gun_part(Vector3(0.05, 0.16, 0.07), Vector3(0.0, -0.13, -0.05), color)
+
+func _add_gun_part(part_size: Vector3, offset: Vector3, color: Color) -> void:
+	var part := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = part_size
+	part.mesh = box
+	part.position = offset
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color
+	material.metallic = 0.6
+	material.roughness = 0.4
+	part.material_override = material
+	_viewmodel.add_child(part)
+
+func _viewmodel_color(weapon_type: String) -> Color:
+	match weapon_type:
+		"pistol":
+			return Color(0.18, 0.18, 0.2)
+		"smg":
+			return Color(0.2, 0.2, 0.16)
+		"assault_rifle":
+			return Color(0.22, 0.16, 0.12)
+		"shotgun":
+			return Color(0.26, 0.18, 0.1)
+		"sniper":
+			return Color(0.12, 0.14, 0.16)
+		_:
+			return Color(0.18, 0.18, 0.2)
+
+func _barrel_length(weapon_type: String) -> float:
+	match weapon_type:
+		"pistol":
+			return 0.12
+		"smg":
+			return 0.2
+		"assault_rifle":
+			return 0.34
+		"shotgun":
+			return 0.36
+		"sniper":
+			return 0.5
+		_:
+			return 0.28
 
 func _play_fire_effects() -> void:
 	_set_flash_visible(true)
