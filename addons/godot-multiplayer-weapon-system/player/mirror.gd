@@ -45,8 +45,10 @@ func _ready() -> void:
 	var material := StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.albedo_texture = _viewport.get_texture()
-	# Flip horizontally for the lateral inversion a mirror shows.
-	material.uv1_scale = Vector3(-1.0, 1.0, 1.0)
+	# No UV flip: the reflection camera's basis is already laterally inverted
+	# relative to the viewer (its right vector is the viewer's left), which is the
+	# lateral inversion a mirror shows. Flipping here would double-invert and
+	# break horizontal parallax.
 	_surface.material_override = material
 
 func _process(_delta: float) -> void:
