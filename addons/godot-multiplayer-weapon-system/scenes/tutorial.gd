@@ -1,39 +1,49 @@
 extends Node3D
 """
-Offline practice range.
+Offline practice range / tutorial.
 
-Lets a single local player test movement, weapon switching, firing,
-spread/recoil, reload, and damage against dummy targets without starting a
-multiplayer session. With no network peer active, the player body is its own
-authority, so everything runs locally. Reached from the lobby's Tutorial button;
-press ESC to return to the main menu.
+A single local player (its own authority, since no network peer is active) can
+learn the controls and try every loadout without setting up multiplayer. The
+scene is laid out in three zones:
+
+  1. Movement — signage plus a small obstacle course (steps, a gap, a low
+     overhang) to practise walking, jumping, sprinting, crouching and sliding.
+  2. Combat — signage for firing, reloading, and switching weapons.
+  3. Firing range — a free loadout station (the buy menu with effectively
+     infinite credits) and dummy targets at marked distances.
+
+Press B to open the loadout station, ESC to return to the main menu.
 """
 
 const PLAYER_SCENE: String = "res://addons/godot-multiplayer-weapon-system/player/player.tscn"
 const DUMMY_SCENE: String = "res://addons/godot-multiplayer-weapon-system/player/target_dummy.tscn"
+const BUY_MENU_SCENE: String = "res://addons/godot-multiplayer-weapon-system/ui/buy_menu.tscn"
 const MAIN_SCENE: String = "res://addons/godot-multiplayer-weapon-system/scenes/main.tscn"
 
-## Where dummy targets are placed (in front of the player, who faces -Z).
-const DUMMY_POSITIONS: Array[Vector3] = [
-	Vector3(-4.0, 1.0, -9.0),
-	Vector3(0.0, 1.0, -11.0),
-	Vector3(4.0, 1.0, -9.0),
-	Vector3(-2.0, 1.0, -16.0),
-	Vector3(2.5, 1.0, -16.0),
-]
+## Effectively unlimited credits for the loadout station.
+const SANDBOX_CREDITS: int = 10_000_000
+
+## Player spawn (faces -Z, toward the range).
+const SPAWN: Vector3 = Vector3(0.0, 1.5, 8.0)
+
+var _player: PlayerController = null
 
 func _ready() -> void:
 	_build_environment()
 	_build_floor()
-	_build_cover()
-	_spawn_dummies()
+	_build_movement_course()
+	_build_range()
+	_build_signs()
 	_spawn_player()
-	_build_instructions()
+	_setup_loadout_station()
+	_build_hud_overlay()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("disconnect_network"):
 		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 		get_tree().change_scene_to_file(MAIN_SCENE)
+
+# === World ===
 
 func _build_environment() -> void:
 	var env := Environment.new()
@@ -53,14 +63,79 @@ func _build_environment() -> void:
 	add_child(sun)
 
 func _build_floor() -> void:
-	var floor_color := Color(0.2, 0.22, 0.26)
-	_add_static_box(Vector3(0.0, -0.5, -6.0), Vector3(60.0, 1.0, 60.0), floor_color)
+	# Spans the spawn (z≈8) through the 30 m range (z≈-22).
+	_add_static_box(Vector3(0.0, -0.5, -7.0), Vector3(70.0, 1.0, 70.0), Color(0.2, 0.22, 0.26))
 
-func _build_cover() -> void:
-	var cover_color := Color(0.3, 0.26, 0.22)
-	_add_static_box(Vector3(-3.0, 0.75, -5.0), Vector3(1.5, 1.5, 1.5), cover_color)
-	_add_static_box(Vector3(3.5, 1.0, -7.0), Vector3(1.5, 2.0, 1.5), cover_color)
-	_add_static_box(Vector3(0.0, 0.5, -13.0), Vector3(3.0, 1.0, 1.0), cover_color)
+## A small obstacle course off to the right of spawn.
+func _build_movement_course() -> void:
+	var step_color := Color(0.28, 0.3, 0.34)
+	# Ascending steps to walk/jump up.
+	_add_static_box(Vector3(7.0, 0.25, 6.0), Vector3(2.0, 0.5, 2.0), step_color)
+	_add_static_box(Vector3(9.0, 0.6, 6.0), Vector3(2.0, 1.2, 2.0), step_color)
+	_add_static_box(Vector3(11.0, 1.0, 6.0), Vector3(2.0, 2.0, 2.0), step_color)
+
+	# A raised platform with a gap to jump across.
+	_add_static_box(Vector3(9.0, 0.75, 1.5), Vector3(4.0, 1.5, 2.0), step_color)
+	_add_static_box(Vector3(9.0, 0.75, -3.0), Vector3(4.0, 1.5, 2.0), step_color)
+
+	# A low overhang to crouch/slide under (underside at y≈1.3).
+	var overhang_color := Color(0.34, 0.28, 0.24)
+	_add_static_box(Vector3(4.5, 0.6, 2.0), Vector3(0.4, 1.2, 0.4), overhang_color)
+	_add_static_box(Vector3(6.5, 0.6, 2.0), Vector3(0.4, 1.2, 0.4), overhang_color)
+	_add_static_box(Vector3(5.5, 1.45, 2.0), Vector3(2.4, 0.3, 1.2), overhang_color)
+
+## The firing range: distance markers and dummy targets straight ahead.
+func _build_range() -> void:
+	# Distance is measured from the spawn point (z = 8).
+	_add_distance_row(10.0, [Vector3(-2.0, 1.0, -2.0), Vector3(2.0, 1.0, -2.0)])
+	_add_distance_row(20.0, [Vector3(-3.0, 1.0, -12.0), Vector3(0.0, 1.0, -12.0), Vector3(3.0, 1.0, -12.0)])
+	_add_distance_row(30.0, [Vector3(-2.0, 1.0, -22.0), Vector3(2.0, 1.0, -22.0)])
+
+	# Side cover to practise peeking.
+	_add_static_box(Vector3(-6.0, 1.0, -8.0), Vector3(1.0, 2.0, 4.0), Color(0.3, 0.26, 0.22))
+	_add_static_box(Vector3(6.0, 1.0, -8.0), Vector3(1.0, 2.0, 4.0), Color(0.3, 0.26, 0.22))
+
+func _add_distance_row(meters: float, positions: Array) -> void:
+	for pos in positions:
+		_spawn_dummy(pos)
+	# A marker post at the left edge of the row.
+	var marker_z: float = positions[0].z
+	_add_sign(Vector3(-7.0, 1.5, marker_z), "%dm" % int(meters), 96, Color(1.0, 0.85, 0.4))
+
+func _build_signs() -> void:
+	var movement := "MOVEMENT\nMove WASD · Look Mouse\nJump %s · Sprint %s\nCrouch %s · Slide %s" % [
+		_key_for("jump"), _key_for("sprint"), _key_for("crouch"), _key_for("slide")]
+	_add_sign(Vector3(8.0, 3.2, 7.5), movement, 56, Color(0.7, 0.9, 1.0))
+
+	var combat := "COMBAT\nFire %s · Reload %s\nPrimary %s · Secondary %s\nLoadout %s" % [
+		_key_for("shoot"), _key_for("reload"), _key_for("weapon_primary"),
+		_key_for("weapon_secondary"), _key_for("buy")]
+	_add_sign(Vector3(0.0, 3.2, 4.0), combat, 56, Color(1.0, 0.8, 0.7))
+
+	_add_sign(Vector3(0.0, 3.2, -26.0),
+		"FIRING RANGE\nTargets respawn · Free loadout (%s)" % _key_for("buy"),
+		56, Color(0.8, 1.0, 0.8))
+
+## The display label for an action's first bound key/mouse button, read from the
+## live InputMap so signage matches the actual bindings.
+func _key_for(action: String) -> String:
+	if not InputMap.has_action(action):
+		return "?"
+	for event in InputMap.action_get_events(action):
+		if event is InputEventKey:
+			var keycode: int = event.physical_keycode if event.physical_keycode != 0 else event.keycode
+			return OS.get_keycode_string(keycode)
+		if event is InputEventMouseButton:
+			match event.button_index:
+				MOUSE_BUTTON_LEFT:
+					return "LMB"
+				MOUSE_BUTTON_RIGHT:
+					return "RMB"
+				_:
+					return "Mouse %d" % event.button_index
+	return "?"
+
+# === Builders ===
 
 ## Build a StaticBody3D box (collision + mesh) on the default collision layer so
 ## the player and projectiles interact with it.
@@ -85,34 +160,62 @@ func _add_static_box(pos: Vector3, box_size: Vector3, color: Color) -> void:
 
 	add_child(body)
 
-func _spawn_dummies() -> void:
+func _add_sign(pos: Vector3, text: String, font_size: int, color: Color) -> void:
+	var label := Label3D.new()
+	label.position = pos
+	label.text = text
+	label.font_size = font_size
+	label.pixel_size = 0.008
+	label.modulate = color
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.double_sided = true
+	label.no_depth_test = false
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	add_child(label)
+
+func _spawn_dummy(pos: Vector3) -> void:
 	var scene: PackedScene = load(DUMMY_SCENE)
-	for pos in DUMMY_POSITIONS:
-		var dummy := scene.instantiate()
-		add_child(dummy)
-		dummy.global_position = pos
+	var dummy := scene.instantiate()
+	add_child(dummy)
+	dummy.global_position = pos
 
 func _spawn_player() -> void:
-	# Equip a primary so weapon switching (1/2) is testable; the pistol fills the
-	# secondary slot by default.
+	# Start with an AR primary and pistol secondary so 1/2 switching is testable;
+	# any weapon can be swapped in at the loadout station.
 	PlayerLoadout.primary_weapon = "ar_basic"
 	PlayerLoadout.secondary_weapon = "pistol_basic"
 
-	var player: PlayerController = load(PLAYER_SCENE).instantiate()
-	player.name = "Player_1"
-	player.authority_peer_id = 1
-	add_child(player)
-	player.global_position = Vector3(0.0, 1.5, 5.0)
+	_player = load(PLAYER_SCENE).instantiate()
+	_player.name = "Player_1"
+	_player.authority_peer_id = 1
+	add_child(_player)
+	_player.global_position = SPAWN
 
-func _build_instructions() -> void:
+# === Loadout station (free economy) ===
+
+func _setup_loadout_station() -> void:
+	# Park GameState in a never-ending buy phase with effectively infinite
+	# credits so the buy menu acts as a free loadout station. Offline, GameState
+	# is its own authority, so purchases resolve locally.
+	GameState.current_round_state = GameState.RoundState.BUY_PHASE
+	GameState.round_timer = 1.0e9
+	GameState.player_credits[GameState._local_peer_id()] = SANDBOX_CREDITS
+
+	var buy_menu = load(BUY_MENU_SCENE).instantiate()
+	add_child(buy_menu)
+	buy_menu.enable_sandbox_mode()
+
+func _build_hud_overlay() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
 
 	var label := Label.new()
 	label.position = Vector2(16.0, 12.0)
 	label.add_theme_color_override("font_color", Color(0.85, 0.9, 1.0))
-	label.text = "PRACTICE RANGE\n" \
-		+ "WASD move · Mouse look · Space jump · Shift sprint · Ctrl crouch\n" \
-		+ "LMB fire · R reload · 1 primary (AR) · 2 secondary (pistol)\n" \
-		+ "Shoot the dummies — they respawn. ESC: back to menu"
+	label.text = "PRACTICE RANGE — free loadout, targets respawn\n" \
+		+ "Move WASD · Look Mouse · Jump %s · Sprint %s · Crouch %s · Slide %s\n" % [
+			_key_for("jump"), _key_for("sprint"), _key_for("crouch"), _key_for("slide")] \
+		+ "Fire %s · Reload %s · Switch %s/%s · Loadout %s · Menu %s" % [
+			_key_for("shoot"), _key_for("reload"), _key_for("weapon_primary"),
+			_key_for("weapon_secondary"), _key_for("buy"), _key_for("disconnect_network")]
 	layer.add_child(label)
