@@ -147,7 +147,9 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		_yaw -= event.relative.x * MOUSE_SENSITIVITY
 		_pitch -= event.relative.y * MOUSE_SENSITIVITY
-		_pitch = clamp(_pitch, -MOUSE_VERTICAL_LIMIT, MOUSE_VERTICAL_LIMIT)
+		# MOUSE_VERTICAL_LIMIT is in degrees; _pitch is radians.
+		var pitch_limit := deg_to_rad(MOUSE_VERTICAL_LIMIT)
+		_pitch = clamp(_pitch, -pitch_limit, pitch_limit)
 
 func _unhandled_input(event: InputEvent) -> void:
 	# Browsers only grant pointer lock (MOUSE_MODE_CAPTURED) from a user gesture,
@@ -230,8 +232,10 @@ func _handle_movement(delta: float) -> void:
 	# Apply movement
 	move_and_slide()
 
-	# Camera rotation follows body yaw
-	_yaw = clamp(_yaw, -PI, PI)
+	# Camera rotation follows body yaw. Wrap (don't clamp) so horizontal turning
+	# is unlimited — wrapping from PI to -PI is the same orientation, so it's
+	# seamless, whereas clamping would hard-stop the view at +/-180 degrees.
+	_yaw = wrapf(_yaw, -PI, PI)
 	rotation = Vector3(0, _yaw, 0)
 	_camera.rotation = Vector3(_pitch, 0, 0)
 
