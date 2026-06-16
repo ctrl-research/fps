@@ -74,7 +74,10 @@ func _on_join_pressed() -> void:
 
 func _on_tutorial_pressed() -> void:
 	# Offline practice range — no multiplayer session required.
-	get_tree().change_scene_to_file("res://addons/godot-multiplayer-weapon-system/scenes/tutorial.tscn")
+	var err := get_tree().change_scene_to_file("res://addons/godot-multiplayer-weapon-system/scenes/tutorial.tscn")
+	if err != OK:
+		status_label.text = "Tutorial failed to load (error %d)" % err
+		push_error("Tutorial scene failed to load: %d" % err)
 func _on_host_online_pressed() -> void:
 	var err = MultiplayerManager.host_online()
 	if err != OK:

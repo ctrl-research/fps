@@ -68,6 +68,12 @@ func _close() -> void:
 func _on_ready_pressed() -> void:
 	GameState.request_ready()
 
+## Tutorial/sandbox: act as a free loadout station. Hides the round-flow controls
+## (Ready button + countdown) so the menu never starts a round.
+func enable_sandbox_mode() -> void:
+	_ready_button.visible = false
+	_timer_label.visible = false
+
 func _on_credits_changed(_peer_id: int, _new_credits: int) -> void:
 	_refresh()
 
