@@ -1,9 +1,14 @@
-extends Resource
-class_name WeaponDatabase
+extends Node
 
 """
-Resource database for weapons, attachments, and equipment.
-Serves as a central registry for all game items.
+Central registry of weapons, attachments, and equipment.
+
+Registered as the `WeaponDatabase` autoload, so it must extend Node (a `*`
+autoload cannot be a Resource) and is only ever used as that singleton.
+
+No `class_name`: a matching global class would shadow the autoload singleton,
+making clean compiles treat `WeaponDatabase.get_weapon()` as a static call on
+the class and fail.
 """
 
 ## Signal emitted when the database is modified

@@ -74,7 +74,7 @@ func _ready() -> void:
 	_camera.fov = 90.0
 	add_child(_camera)
 
-	var is_local := multiplayer.has_multiplayer_authority()
+	var is_local := is_multiplayer_authority()
 	_camera.current = is_local
 
 	# Weapon handling exists on every body: the local one reads input, remote
@@ -108,11 +108,11 @@ func _input(event: InputEvent) -> void:
 		_pitch = clamp(_pitch, -MOUSE_VERTICAL_LIMIT, MOUSE_VERTICAL_LIMIT)
 
 func _process(delta: float) -> void:
-	if multiplayer.has_multiplayer_authority():
+	if is_multiplayer_authority():
 		_send_sync_data()
 
 func _physics_process(delta: float) -> void:
-	if not multiplayer.has_multiplayer_authority():
+	if not is_multiplayer_authority():
 		# Remote player — interpolate toward synced position
 		global_position = global_position.lerp(sync_position, delta * 10.0)
 		rotation = sync_rotation
@@ -239,7 +239,7 @@ func release_mouse() -> void:
 # --- Called by lobby or game manager to spawn player at a position ---
 func spawn_at(pos: Vector3) -> void:
 	global_position = pos
-	if multiplayer.has_multiplayer_authority():
+	if is_multiplayer_authority():
 		_capture_mouse()
 
 # === Combat ===

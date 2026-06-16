@@ -50,7 +50,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_open()
 		get_viewport().set_input_as_handled()
 
-func _on_round_state_changed(state: GameState.RoundState) -> void:
+func _on_round_state_changed(state: int) -> void:
 	if state == GameState.RoundState.BUY_PHASE:
 		_open()
 	else:
