@@ -89,6 +89,9 @@ jobs:
   deploy-pages:
     name: Deploy Web to GitHub Pages
     needs: build
+    # Only publish to production Pages from main; branch dispatches build+export
+    # for validation without deploying.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

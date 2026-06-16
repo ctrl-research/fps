@@ -151,7 +151,7 @@ func _load_game_scene() -> void:
 	get_tree().root.add_child(game)
 	queue_free()  # Remove lobby
 
-func _on_connection_state_changed(state: MultiplayerManager.ConnectionState) -> void:
+func _on_connection_state_changed(state: int) -> void:
 	_update_ui(state)
 
 func _on_peer_connected(peer_id: int) -> void:
@@ -160,7 +160,7 @@ func _on_peer_connected(peer_id: int) -> void:
 func _on_peer_disconnected(peer_id: int) -> void:
 	_refresh_player_list()
 
-func _update_ui(state: MultiplayerManager.ConnectionState) -> void:
+func _update_ui(state: int) -> void:
 	# Offline practice is only offered when not in a session.
 	tutorial_button.visible = state == MultiplayerManager.ConnectionState.DISCONNECTED
 	match state:

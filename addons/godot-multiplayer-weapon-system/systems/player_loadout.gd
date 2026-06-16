@@ -1,5 +1,6 @@
 extends Node
-class_name PlayerLoadout
+# No `class_name`: registered as the `PlayerLoadout` autoload; a matching global
+# class would shadow the singleton and break clean compiles.
 """
 Autoload singleton tracking the local player's chosen loadout for the buy phase.
 

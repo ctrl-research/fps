@@ -1,9 +1,12 @@
 extends Resource
-class_name WeaponDatabase
 
 """
 Resource database for weapons, attachments, and equipment.
 Serves as a central registry for all game items.
+
+No `class_name`: it is registered as the `WeaponDatabase` autoload, and a
+matching global class would shadow that singleton — causing clean compiles to
+treat `WeaponDatabase.get_weapon()` as a static call on the class and fail.
 """
 
 ## Signal emitted when the database is modified

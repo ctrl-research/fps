@@ -1,5 +1,6 @@
 extends Node
-class_name MultiplayerManager
+# No `class_name`: registered as the `MultiplayerManager` autoload; a matching
+# global class would shadow the singleton and break clean compiles.
 """
 Autoload singleton for multiplayer peer management.
 Handles host/server creation, client connections, and peer lifecycle.

@@ -1,13 +1,16 @@
 extends Node
-
-class_name GameState
 """
 Autoload singleton for managing round state, team scores, and economy.
 Handles the core game loop state machine and credit distribution.
+
+No `class_name`: the autoload is registered as `GameState`, and a matching
+global class would shadow that singleton — which makes clean compiles (CI
+export, web/exported runtime) resolve `GameState.x` to the class and fail. The
+autoload name alone provides global access.
 """
 
-## Emitted when round state changes
-signal round_state_changed(new_state: GameState.RoundState)
+## Emitted when round state changes (value is a RoundState enum)
+signal round_state_changed(new_state: RoundState)
 
 ## Emitted when a team's score updates
 signal team_score_updated(team_id: int, new_score: int)
