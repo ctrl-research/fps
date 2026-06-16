@@ -35,6 +35,7 @@ func _ready() -> void:
 	_build_range()
 	_build_signs()
 	_spawn_player()
+	_build_mirror()
 	_setup_loadout_station()
 	_build_hud_overlay()
 
@@ -190,6 +191,14 @@ func _spawn_player() -> void:
 	_player.authority_peer_id = 1
 	add_child(_player)
 	_player.global_position = SPAWN
+
+## A mirror just behind the spawn — turn around to see yourself and your weapon.
+func _build_mirror() -> void:
+	var mirror := Mirror.new()
+	add_child(mirror)
+	mirror.global_position = Vector3(0.0, 1.6, 11.0)
+	mirror.rotation_degrees = Vector3(0.0, 180.0, 0.0)
+	_add_sign(Vector3(0.0, 3.3, 11.0), "MIRROR — turn around", 48, Color(0.8, 0.9, 1.0))
 
 # === Loadout station (free economy) ===
 
