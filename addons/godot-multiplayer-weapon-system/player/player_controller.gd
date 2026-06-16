@@ -59,6 +59,9 @@ var _is_sliding: bool = false
 var _slide_timer: float = 0.0
 var _slide_cooldown_timer: float = 0.0
 var _slide_direction: Vector3 = Vector3.ZERO
+# Most recent non-zero movement input (local space). Slides launch in this
+# direction rather than the current velocity.
+var _last_input_dir: Vector3 = Vector3.ZERO
 var _velocity_y: float = 0.0
 var _mouse_captured: bool = false
 var _yaw: float = 0.0
@@ -191,6 +194,16 @@ func _handle_movement(delta: float) -> void:
 	input_dir.x = Input.get_axis("move_left", "move_right")
 	input_dir.z = Input.get_axis("move_forward", "move_backward")
 
+	if input_dir.length() > 0.1:
+		_last_input_dir = input_dir.normalized()
+
+	# Crouch initiates a slide while moving; otherwise it just crouches.
+	if Input.is_action_just_pressed("crouch") and _slide_cooldown_timer <= 0:
+		var horizontal_speed := Vector2(velocity.x, velocity.z).length()
+		if horizontal_speed > 1.0 and _last_input_dir.length() > 0.1:
+			_begin_slide(_last_input_dir)
+			return
+
 	# Crouch
 	_update_crouch(delta, input_dir)
 
@@ -204,11 +217,6 @@ func _handle_movement(delta: float) -> void:
 		_current_speed = SPRINT_SPEED
 	else:
 		_current_speed = WALK_SPEED
-
-	# Slide initiation
-	if Input.is_action_just_pressed("slide") and not _is_crouching and _slide_cooldown_timer <= 0:
-		if input_dir.length() > 0.1:
-			_begin_slide(input_dir.normalized())
 
 	# Gravity
 	if not is_on_floor():

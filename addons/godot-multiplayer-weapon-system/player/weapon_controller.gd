@@ -185,6 +185,8 @@ func _try_fire() -> void:
 	if weapon == null or _reloading or _cooldown > 0.0:
 		return
 	if not weapon.can_fire():
+		# Out of ammo — auto-reload instead of dry-firing.
+		_start_reload()
 		return
 
 	weapon.consume()
@@ -202,6 +204,10 @@ func _try_fire() -> void:
 	_play_fire_effects()
 	_broadcast_fire_effects()
 	ammo_changed.emit(weapon.mag, weapon.reserve)
+
+	# Auto-reload as soon as the magazine runs dry.
+	if weapon.mag == 0:
+		_start_reload()
 
 func _fire_hitscan(weapon: Weapon) -> void:
 	if _camera == null:

@@ -104,8 +104,8 @@ func _add_distance_row(meters: float, positions: Array) -> void:
 	_add_sign(Vector3(-7.0, 1.5, marker_z), "%dm" % int(meters), 96, Color(1.0, 0.85, 0.4))
 
 func _build_signs() -> void:
-	var movement := "MOVEMENT\nMove WASD · Look Mouse\nJump %s · Sprint %s\nCrouch %s · Slide %s" % [
-		_key_for("jump"), _key_for("sprint"), _key_for("crouch"), _key_for("slide")]
+	var movement := "MOVEMENT\nMove WASD · Look Mouse\nJump %s · Sprint %s\nCrouch %s (slides while moving)" % [
+		_key_for("jump"), _key_for("sprint"), _key_for("crouch")]
 	_add_sign(Vector3(8.0, 3.2, 7.5), movement, 56, Color(0.7, 0.9, 1.0))
 
 	var combat := "COMBAT\nFire %s · Reload %s\nPrimary %s · Secondary %s\nLoadout %s" % [
@@ -222,8 +222,8 @@ func _build_hud_overlay() -> void:
 	label.position = Vector2(16.0, 12.0)
 	label.add_theme_color_override("font_color", Color(0.85, 0.9, 1.0))
 	label.text = "PRACTICE RANGE — free loadout, targets respawn\n" \
-		+ "Move WASD · Look Mouse · Jump %s · Sprint %s · Crouch %s · Slide %s\n" % [
-			_key_for("jump"), _key_for("sprint"), _key_for("crouch"), _key_for("slide")] \
+		+ "Move WASD · Look Mouse · Jump %s · Sprint %s · Crouch/Slide %s\n" % [
+			_key_for("jump"), _key_for("sprint"), _key_for("crouch")] \
 		+ "Fire %s · Reload %s · Switch %s/%s · Loadout %s · Menu %s" % [
 			_key_for("shoot"), _key_for("reload"), _key_for("weapon_primary"),
 			_key_for("weapon_secondary"), _key_for("buy"), _key_for("disconnect_network")]
