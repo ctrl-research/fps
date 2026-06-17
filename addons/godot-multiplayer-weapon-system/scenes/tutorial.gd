@@ -18,7 +18,15 @@ Press B to open the loadout station, ESC to return to the main menu.
 const PLAYER_SCENE: String = "res://addons/godot-multiplayer-weapon-system/player/player.tscn"
 const DUMMY_SCENE: String = "res://addons/godot-multiplayer-weapon-system/player/target_dummy.tscn"
 const BUY_MENU_SCENE: String = "res://addons/godot-multiplayer-weapon-system/ui/buy_menu.tscn"
+const BOT_SCENE: String = "res://addons/godot-multiplayer-weapon-system/player/bot.tscn"
 const MAIN_SCENE: String = "res://addons/godot-multiplayer-weapon-system/scenes/main.tscn"
+
+## Bot arena spawn points (off to the side; bots engage when you get close).
+const BOT_POSITIONS: Array[Vector3] = [
+	Vector3(-14.0, 1.0, -20.0),
+	Vector3(-17.0, 1.0, -22.0),
+	Vector3(-11.0, 1.0, -23.0),
+]
 
 ## Effectively unlimited credits for the loadout station.
 const SANDBOX_CREDITS: int = 10_000_000
@@ -34,6 +42,7 @@ func _ready() -> void:
 	_build_movement_course()
 	_build_range()
 	_build_signs()
+	_build_bots()
 	_spawn_player()
 	_build_mirror()
 	_setup_loadout_station()
@@ -192,12 +201,35 @@ func _spawn_player() -> void:
 	add_child(_player)
 	_player.global_position = SPAWN
 	_player.died.connect(_on_player_died)
+	_player.downed.connect(_on_player_downed)
 
-## Practice range: respawn at spawn shortly after bleeding out.
+## Practice range: respawn quickly when downed (no long bleedout while training).
+func _on_player_downed() -> void:
+	await get_tree().create_timer(2.5).timeout
+	if is_instance_valid(_player) and _player.is_downed:
+		_player.respawn(SPAWN)
+
+## Fallback respawn if the player somehow dies outright.
 func _on_player_died() -> void:
 	await get_tree().create_timer(3.0).timeout
-	if is_instance_valid(_player):
+	if is_instance_valid(_player) and _player.is_dead:
 		_player.respawn(SPAWN)
+
+## Side arena with bots that shoot back and respawn 5s after being defeated.
+func _build_bots() -> void:
+	_add_static_box(Vector3(-9.0, 1.0, -16.0), Vector3(1.0, 2.0, 3.0), Color(0.3, 0.26, 0.22))
+	_add_static_box(Vector3(-13.0, 1.0, -16.5), Vector3(3.0, 1.2, 1.0), Color(0.3, 0.26, 0.22))
+
+	var scene: PackedScene = load(BOT_SCENE)
+	var index := 0
+	for pos in BOT_POSITIONS:
+		var bot: Bot = scene.instantiate()
+		bot.authority_peer_id = 1001 + index * 2  # distinct odd ids = enemy team
+		add_child(bot)
+		bot.global_position = pos
+		index += 1
+
+	_add_sign(Vector3(-14.0, 3.4, -20.0), "COMBAT BOTS\nThey shoot back · respawn 5s", 56, Color(1.0, 0.7, 0.6))
 
 ## A mirror just behind the spawn — turn around to see yourself and your weapon.
 func _build_mirror() -> void:
