@@ -14,6 +14,12 @@ signal died()
 ## Emitted when this body's health changes (current, maximum)
 signal health_changed(current: float, maximum: float)
 
+## Emitted when the player is downed (health hit 0, bleedout begins)
+signal downed()
+
+## Emitted when the player is restored to full (respawn / revive)
+signal revived()
+
 ## Multiplayer authority ID for this body (0 = server/authority)
 @export var authority_peer_id: int = 1
 
@@ -68,8 +74,13 @@ var _yaw: float = 0.0
 var _pitch: float = 0.0
 
 # === Combat ===
+## Seconds in the downed state before bleeding out.
+const DOWNED_DURATION: float = 10.0
+
 var health: float = 100.0
 var is_dead: bool = false
+var is_downed: bool = false
+var bleedout_timer: float = 0.0
 var _weapon_controller: WeaponController = null
 
 func _ready() -> void:
@@ -92,6 +103,14 @@ func _ready() -> void:
 	_weapon_controller.setup(self, _camera, is_local)
 
 	_build_body_mesh(is_local)
+
+	# Joined so the minimap and other systems can enumerate all player bodies.
+	add_to_group("players")
+
+	if is_local:
+		var hud = load("res://addons/godot-multiplayer-weapon-system/ui/game_hud.gd").new()
+		add_child(hud)
+		hud.bind(self)
 
 	# Only process locally for this player
 	# Remote players are set by set_multiplayer_authority externally
@@ -177,7 +196,30 @@ func _physics_process(delta: float) -> void:
 		rotation = sync_rotation
 		return
 
+	if is_dead:
+		return
+
+	if is_downed:
+		_process_downed(delta)
+		return
+
 	_handle_movement(delta)
+
+## Downed players can't move or act; they just bleed out (gravity keeps them
+## grounded). The HUD shows the countdown.
+func _process_downed(delta: float) -> void:
+	bleedout_timer -= delta
+	if bleedout_timer <= 0.0:
+		_bleed_out()
+		return
+	velocity.x = 0.0
+	velocity.z = 0.0
+	if not is_on_floor():
+		_velocity_y -= GRAVITY * delta
+	else:
+		_velocity_y = 0.0
+	velocity.y = _velocity_y
+	move_and_slide()
 
 func _handle_movement(delta: float) -> void:
 	# Slide cooldown
@@ -336,15 +378,40 @@ func _receive_damage(amount: float, attacker_id: int) -> void:
 
 ## Owner-side damage application followed by a health broadcast.
 func _apply_damage(amount: float, _attacker_id: int) -> void:
-	if is_dead or amount <= 0.0:
+	if is_dead or is_downed or amount <= 0.0:
 		return
 	health = max(health - amount, 0.0)
-	if health <= 0.0:
-		is_dead = true
 	health_changed.emit(health, max_health)
 	_broadcast_health()
-	if is_dead:
-		died.emit()
+	if health <= 0.0:
+		_enter_downed()
+
+func _enter_downed() -> void:
+	is_downed = true
+	bleedout_timer = DOWNED_DURATION
+	downed.emit()
+
+func _bleed_out() -> void:
+	is_downed = false
+	is_dead = true
+	health = 0.0
+	health_changed.emit(0.0, max_health)
+	_broadcast_health()
+	died.emit()
+
+## Restore the player to full health at a position (respawn / revive).
+func respawn(pos: Vector3) -> void:
+	is_dead = false
+	is_downed = false
+	bleedout_timer = 0.0
+	health = max_health
+	velocity = Vector3.ZERO
+	_velocity_y = 0.0
+	global_position = pos
+	sync_position = pos
+	health_changed.emit(health, max_health)
+	revived.emit()
+	_broadcast_health()
 
 func _broadcast_health() -> void:
 	if multiplayer.multiplayer_peer == null:

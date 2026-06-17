@@ -111,7 +111,7 @@ func _handle_input() -> void:
 	# menu (and any overlay) releases the mouse, which suppresses combat.
 	if Input.get_mouse_mode() != Input.MOUSE_MODE_CAPTURED:
 		return
-	if _player and _player.is_dead:
+	if _player and (_player.is_dead or _player.is_downed):
 		return
 
 	if Input.is_action_just_pressed("weapon_primary"):
