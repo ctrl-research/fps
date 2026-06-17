@@ -117,6 +117,7 @@ WeaponDatabase="*res://addons/godot-multiplayer-weapon-system/resources/weapon_d
 PlayerLoadout="*res://addons/godot-multiplayer-weapon-system/systems/player_loadout.gd"
 ProjectSettings="*res://addons/godot-multiplayer-weapon-system/systems/project_settings.gd"
 MultiplayerManager="*res://addons/godot-multiplayer-weapon-system/systems/multiplayer_manager.gd"
+Settings="*res://addons/godot-multiplayer-weapon-system/systems/settings.gd"
 
 [rendering]
 

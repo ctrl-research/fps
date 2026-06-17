@@ -27,6 +27,7 @@ const SANDBOX_CREDITS: int = 10_000_000
 const SPAWN: Vector3 = Vector3(0.0, 1.5, 8.0)
 
 var _player: PlayerController = null
+var _pause_menu: PauseMenu = null
 
 func _ready() -> void:
 	_build_environment()
@@ -41,8 +42,23 @@ func _ready() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("disconnect_network"):
-		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-		get_tree().change_scene_to_file(MAIN_SCENE)
+		_toggle_pause()
+
+## Esc opens the in-game menu (Resume / Settings / Leave); pressing it again
+## while open resumes.
+func _toggle_pause() -> void:
+	if is_instance_valid(_pause_menu):
+		_pause_menu.queue_free()
+		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+		return
+	_pause_menu = PauseMenu.new()
+	add_child(_pause_menu)
+	_pause_menu.resumed.connect(func() -> void: Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED))
+	_pause_menu.leave_requested.connect(_on_leave_to_menu)
+
+func _on_leave_to_menu() -> void:
+	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	get_tree().change_scene_to_file(MAIN_SCENE)
 
 # === World ===
 
