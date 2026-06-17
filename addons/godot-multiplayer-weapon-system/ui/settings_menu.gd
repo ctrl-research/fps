@@ -70,6 +70,19 @@ func _build_ui() -> void:
 	_sensitivity_value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	sens_row.add_child(_sensitivity_value_label)
 
+	# Rotate minimap toggle.
+	var minimap_row := HBoxContainer.new()
+	minimap_row.add_theme_constant_override("separation", 12)
+	vbox.add_child(minimap_row)
+	var minimap_label := Label.new()
+	minimap_label.text = "Rotate minimap with view"
+	minimap_label.custom_minimum_size = Vector2(200, 0)
+	minimap_row.add_child(minimap_label)
+	var minimap_check := CheckButton.new()
+	minimap_check.button_pressed = Settings.minimap_rotates
+	minimap_check.toggled.connect(Settings.set_minimap_rotates)
+	minimap_row.add_child(minimap_check)
+
 	var hint := Label.new()
 	hint.text = "Click a binding, then press a key or mouse button (Esc to cancel)."
 	hint.add_theme_font_size_override("font_size", 13)

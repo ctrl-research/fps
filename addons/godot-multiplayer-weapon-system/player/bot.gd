@@ -16,8 +16,8 @@ const GRAVITY: float = 20.0
 const RESPAWN_DELAY: float = 5.0
 const FIRE_INTERVAL: float = 1.8
 const SHOT_DAMAGE: float = 6.0
-## Only engage players within this distance.
-const ENGAGE_RANGE: float = 45.0
+## Only engage players within this distance and with a clear line of sight.
+const ENGAGE_RANGE: float = 16.0
 const FIRE_RANGE: float = 70.0
 const AIM_SPREAD: float = 0.06
 const FLASH_TIME: float = 0.06
@@ -130,10 +130,21 @@ func _find_target() -> PlayerController:
 		if player.is_dead or player.is_downed:
 			continue
 		var dist := global_position.distance_to(player.global_position)
-		if dist <= best_dist:
+		if dist <= best_dist and _has_line_of_sight(player):
 			best = player
 			best_dist = dist
 	return best
+
+## True if nothing solid sits between the bot's eye and the player (so bots
+## behind walls don't fire until you reach the doorway).
+func _has_line_of_sight(player: PlayerController) -> bool:
+	var space := get_world_3d().direct_space_state
+	var query := PhysicsRayQueryParameters3D.create(
+		_eye.global_position, player.global_position + Vector3(0.0, 1.0, 0.0))
+	query.collide_with_bodies = true
+	query.exclude = [get_rid()]
+	var hit := space.intersect_ray(query)
+	return hit.is_empty() or hit.get("collider") == player
 
 func _face(target: PlayerController) -> void:
 	var flat := target.global_position

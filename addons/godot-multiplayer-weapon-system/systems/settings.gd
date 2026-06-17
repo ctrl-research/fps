@@ -39,6 +39,8 @@ const ACTION_LABELS: Dictionary = {
 }
 
 var mouse_sensitivity: float = DEFAULT_MOUSE_SENSITIVITY
+## When true, the minimap rotates with the player's view (border stays fixed).
+var minimap_rotates: bool = false
 
 # Default events captured from the project InputMap at boot, used by reset.
 var _default_events: Dictionary = {}
@@ -75,6 +77,11 @@ func set_mouse_sensitivity(value: float) -> void:
 	save()
 	settings_changed.emit()
 
+func set_minimap_rotates(value: bool) -> void:
+	minimap_rotates = value
+	save()
+	settings_changed.emit()
+
 ## Human-readable label for an action's first bound key / mouse button.
 func binding_label(action: String) -> String:
 	if not InputMap.has_action(action):
@@ -98,6 +105,7 @@ func binding_label(action: String) -> String:
 func save() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("input", "mouse_sensitivity", mouse_sensitivity)
+	cfg.set_value("options", "minimap_rotates", minimap_rotates)
 	for action in BINDABLE_ACTIONS:
 		if not InputMap.has_action(action):
 			continue
@@ -117,6 +125,7 @@ func _load() -> void:
 	if cfg.load(CONFIG_PATH) != OK:
 		return
 	mouse_sensitivity = cfg.get_value("input", "mouse_sensitivity", DEFAULT_MOUSE_SENSITIVITY)
+	minimap_rotates = cfg.get_value("options", "minimap_rotates", false)
 	if not cfg.has_section("keys"):
 		return
 	for action in cfg.get_section_keys("keys"):

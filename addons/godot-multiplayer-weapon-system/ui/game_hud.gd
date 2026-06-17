@@ -140,23 +140,42 @@ func _set_rect(c: Control, al: float, at: float, ar: float, ab: float,
 # === Minimap ===
 
 func _draw_minimap() -> void:
+	# Static square border (does not rotate, even when the map does).
 	var rect := Rect2(Vector2.ZERO, _minimap.size)
 	_minimap.draw_rect(rect, Color(0.05, 0.07, 0.1, 0.6))
 	_minimap.draw_rect(rect, Color(0.5, 0.6, 0.7, 0.5), false, 2.0)
 	if not is_instance_valid(_player):
 		return
+
 	var center := _minimap.size * 0.5
 	var origin := _player.global_position
+	# Rotate so the player's forward points up; 0 keeps it north-up.
+	var rot: float = _player.rotation.y if Settings.minimap_rotates else 0.0
+
 	for node in get_tree().get_nodes_in_group("players"):
 		if not is_instance_valid(node):
 			continue
 		var body := node as Node3D
 		var rel: Vector3 = body.global_position - origin
-		var dot := center + Vector2(rel.x, rel.z) * MINIMAP_PIXELS_PER_METRE
-		if dot.x < 0.0 or dot.x > _minimap.size.x or dot.y < 0.0 or dot.y > _minimap.size.y:
+		var planar := Vector2(rel.x, rel.z).rotated(rot)
+		var dot := center + planar * MINIMAP_PIXELS_PER_METRE
+		if dot.x < 4.0 or dot.x > _minimap.size.x - 4.0 or dot.y < 4.0 or dot.y > _minimap.size.y - 4.0:
 			continue
+		var facing3 := -body.global_transform.basis.z
+		var facing := Vector2(facing3.x, facing3.z)
+		if facing.length() < 0.01:
+			facing = Vector2(0.0, -1.0)
+		facing = facing.rotated(rot).normalized()
 		var color := LOCAL_COLOR if node == _player else _team_color(node)
-		_minimap.draw_circle(dot, MINIMAP_DOT_RADIUS, color)
+		_draw_pointer(dot, facing, color)
+
+## A small arrowhead at `pos` pointing along `facing` (a directional dot).
+func _draw_pointer(pos: Vector2, facing: Vector2, color: Color) -> void:
+	var side := Vector2(-facing.y, facing.x)
+	var tip := pos + facing * 7.0
+	var base_a := pos - facing * 5.0 + side * 4.5
+	var base_b := pos - facing * 5.0 - side * 4.5
+	_minimap.draw_colored_polygon(PackedVector2Array([tip, base_a, base_b]), color)
 
 func _team_color(node: Node) -> Color:
 	var peer_id: int = node.get("authority_peer_id") if node.get("authority_peer_id") != null else 0
