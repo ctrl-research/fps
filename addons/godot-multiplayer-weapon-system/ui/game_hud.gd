@@ -65,8 +65,8 @@ func _build_ui() -> void:
 	# Bottom-left stack: grenades, equipment, health.
 	var bottom_left := VBoxContainer.new()
 	add_child(bottom_left)
-	# Anchor to the bottom-left and grow up/right so it stays on screen.
-	_place(bottom_left, 0.0, 1.0, 16.0, -16.0, Control.GROW_DIRECTION_END, Control.GROW_DIRECTION_BEGIN)
+	# Fixed region in the bottom-left corner.
+	_set_rect(bottom_left, 0.0, 1.0, 0.0, 1.0, 16.0, -120.0, 320.0, -16.0)
 	bottom_left.add_theme_constant_override("separation", 6)
 
 	_grenades_box = HBoxContainer.new()
@@ -97,7 +97,7 @@ func _build_ui() -> void:
 	var top_center := VBoxContainer.new()
 	top_center.alignment = BoxContainer.ALIGNMENT_CENTER
 	add_child(top_center)
-	_place(top_center, 0.5, 0.0, 0.0, 12.0, Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_END)
+	_set_rect(top_center, 0.5, 0.0, 0.5, 0.0, -240.0, 12.0, 240.0, 84.0)
 	_scores_label = Label.new()
 	_scores_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_scores_label.add_theme_font_size_override("font_size", 22)
@@ -113,29 +113,29 @@ func _build_ui() -> void:
 	_minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_minimap.draw.connect(_draw_minimap)
 	add_child(_minimap)
-	_place(_minimap, 1.0, 0.0, -16.0, 16.0, Control.GROW_DIRECTION_BEGIN, Control.GROW_DIRECTION_END)
+	_set_rect(_minimap, 1.0, 0.0, 1.0, 0.0, -(MINIMAP_SIZE + 16.0), 16.0, -16.0, MINIMAP_SIZE + 16.0)
 
 	# Center: downed / eliminated status.
 	_status_label = Label.new()
 	_status_label.add_theme_font_size_override("font_size", 40)
 	_status_label.add_theme_color_override("font_color", Color(1.0, 0.4, 0.35))
 	add_child(_status_label)
-	_place(_status_label, 0.5, 0.5, 0.0, 0.0, Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH)
+	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_set_rect(_status_label, 0.5, 0.5, 0.5, 0.5, -260.0, -40.0, 260.0, 40.0)
 
-## Anchor a control to a single point (ax, ay in 0..1) with a pixel offset, and
-## set which way it grows to fit its content. Avoids the preset/MINSIZE timing
-## pitfall where offsets get baked before children exist.
-func _place(c: Control, ax: float, ay: float, ox: float, oy: float, grow_h: int, grow_v: int) -> void:
-	c.anchor_left = ax
-	c.anchor_right = ax
-	c.anchor_top = ay
-	c.anchor_bottom = ay
-	c.offset_left = ox
-	c.offset_right = ox
-	c.offset_top = oy
-	c.offset_bottom = oy
-	c.grow_horizontal = grow_h
-	c.grow_vertical = grow_v
+## Anchor a control to an explicit rect (anchors + pixel offsets), matching the
+## proven pattern in the weapon HUD. Avoids the zero-size + grow approach, which
+## left widgets collapsed off-screen.
+func _set_rect(c: Control, al: float, at: float, ar: float, ab: float,
+		ol: float, ot: float, orr: float, ob: float) -> void:
+	c.anchor_left = al
+	c.anchor_top = at
+	c.anchor_right = ar
+	c.anchor_bottom = ab
+	c.offset_left = ol
+	c.offset_top = ot
+	c.offset_right = orr
+	c.offset_bottom = ob
 
 # === Minimap ===
 
