@@ -21,11 +21,11 @@ const BUY_MENU_SCENE: String = "res://addons/godot-multiplayer-weapon-system/ui/
 const BOT_SCENE: String = "res://addons/godot-multiplayer-weapon-system/player/bot.tscn"
 const MAIN_SCENE: String = "res://addons/godot-multiplayer-weapon-system/scenes/main.tscn"
 
-## Bot arena spawn points (off to the side; bots engage when you get close).
+## Bot positions: left of the firing lane with clear line of sight to the range.
 const BOT_POSITIONS: Array[Vector3] = [
-	Vector3(-14.0, 1.0, -20.0),
-	Vector3(-17.0, 1.0, -22.0),
-	Vector3(-11.0, 1.0, -23.0),
+	Vector3(-10.0, 1.0, -9.0),
+	Vector3(-13.0, 1.0, -12.0),
+	Vector3(-8.0, 1.0, -15.0),
 ]
 
 ## Effectively unlimited credits for the loadout station.
@@ -233,10 +233,10 @@ func _on_player_died() -> void:
 	if is_instance_valid(_player) and _player.is_dead:
 		_player.respawn(SPAWN)
 
-## Side arena with bots that shoot back and respawn 5s after being defeated.
+## Bots that shoot back and respawn 5s after being defeated. A chest-high wall
+## near the lane gives the player cover without blocking the bots' line of sight.
 func _build_bots() -> void:
-	_add_static_box(Vector3(-9.0, 1.0, -16.0), Vector3(1.0, 2.0, 3.0), Color(0.3, 0.26, 0.22))
-	_add_static_box(Vector3(-13.0, 1.0, -16.5), Vector3(3.0, 1.2, 1.0), Color(0.3, 0.26, 0.22))
+	_add_static_box(Vector3(-4.0, 0.6, -8.0), Vector3(3.0, 1.2, 0.6), Color(0.3, 0.26, 0.22))
 
 	var scene: PackedScene = load(BOT_SCENE)
 	var index := 0
@@ -247,7 +247,7 @@ func _build_bots() -> void:
 		bot.global_position = pos
 		index += 1
 
-	_add_sign(Vector3(-14.0, 3.4, -20.0), "COMBAT BOTS\nThey shoot back · respawn 5s", 56, Color(1.0, 0.7, 0.6))
+	_add_sign(Vector3(-10.0, 3.2, -12.0), "COMBAT BOTS\nThey shoot back · respawn 5s", 56, Color(1.0, 0.7, 0.6))
 
 ## A mirror just behind the spawn — turn around to see yourself and your weapon.
 func _build_mirror() -> void:

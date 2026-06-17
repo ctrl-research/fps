@@ -64,9 +64,10 @@ func _process(_delta: float) -> void:
 func _build_ui() -> void:
 	# Bottom-left stack: grenades, equipment, health.
 	var bottom_left := VBoxContainer.new()
-	bottom_left.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT, Control.PRESET_MODE_MINSIZE, 16)
-	bottom_left.add_theme_constant_override("separation", 6)
 	add_child(bottom_left)
+	# Fixed region in the bottom-left corner.
+	_set_rect(bottom_left, 0.0, 1.0, 0.0, 1.0, 16.0, -120.0, 320.0, -16.0)
+	bottom_left.add_theme_constant_override("separation", 6)
 
 	_grenades_box = HBoxContainer.new()
 	_grenades_box.add_theme_constant_override("separation", 10)
@@ -94,9 +95,9 @@ func _build_ui() -> void:
 
 	# Top-center: team scores + buy hint.
 	var top_center := VBoxContainer.new()
-	top_center.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, 12)
 	top_center.alignment = BoxContainer.ALIGNMENT_CENTER
 	add_child(top_center)
+	_set_rect(top_center, 0.5, 0.0, 0.5, 0.0, -240.0, 12.0, 240.0, 84.0)
 	_scores_label = Label.new()
 	_scores_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_scores_label.add_theme_font_size_override("font_size", 22)
@@ -109,17 +110,32 @@ func _build_ui() -> void:
 	# Top-right: minimap.
 	_minimap = Control.new()
 	_minimap.custom_minimum_size = Vector2(MINIMAP_SIZE, MINIMAP_SIZE)
-	_minimap.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_MINSIZE, 16)
 	_minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_minimap.draw.connect(_draw_minimap)
 	add_child(_minimap)
+	_set_rect(_minimap, 1.0, 0.0, 1.0, 0.0, -(MINIMAP_SIZE + 16.0), 16.0, -16.0, MINIMAP_SIZE + 16.0)
 
 	# Center: downed / eliminated status.
 	_status_label = Label.new()
-	_status_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
 	_status_label.add_theme_font_size_override("font_size", 40)
 	_status_label.add_theme_color_override("font_color", Color(1.0, 0.4, 0.35))
 	add_child(_status_label)
+	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_set_rect(_status_label, 0.5, 0.5, 0.5, 0.5, -260.0, -40.0, 260.0, 40.0)
+
+## Anchor a control to an explicit rect (anchors + pixel offsets), matching the
+## proven pattern in the weapon HUD. Avoids the zero-size + grow approach, which
+## left widgets collapsed off-screen.
+func _set_rect(c: Control, al: float, at: float, ar: float, ab: float,
+		ol: float, ot: float, orr: float, ob: float) -> void:
+	c.anchor_left = al
+	c.anchor_top = at
+	c.anchor_right = ar
+	c.anchor_bottom = ab
+	c.offset_left = ol
+	c.offset_top = ot
+	c.offset_right = orr
+	c.offset_bottom = ob
 
 # === Minimap ===
 
