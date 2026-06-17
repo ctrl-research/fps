@@ -191,6 +191,13 @@ func _spawn_player() -> void:
 	_player.authority_peer_id = 1
 	add_child(_player)
 	_player.global_position = SPAWN
+	_player.died.connect(_on_player_died)
+
+## Practice range: respawn at spawn shortly after bleeding out.
+func _on_player_died() -> void:
+	await get_tree().create_timer(3.0).timeout
+	if is_instance_valid(_player):
+		_player.respawn(SPAWN)
 
 ## A mirror just behind the spawn — turn around to see yourself and your weapon.
 func _build_mirror() -> void:
