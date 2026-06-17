@@ -197,6 +197,8 @@ func _add_sign(pos: Vector3, text: String, font_size: int, color: Color) -> void
 	label.double_sided = true
 	label.no_depth_test = false
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# Keep signage text out of the mirror reflection.
+	label.layers = Mirror.NO_REFLECTION_VISUAL_LAYER
 	add_child(label)
 
 func _spawn_dummy(pos: Vector3) -> void:

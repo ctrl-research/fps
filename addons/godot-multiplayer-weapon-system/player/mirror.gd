@@ -3,17 +3,33 @@ class_name Mirror
 """
 A real-time planar mirror.
 
-A SubViewport renders the shared world from a camera placed at the reflection of
-the active camera across the mirror plane; that render is shown on a quad. The
-mirror surface lives on its own visual layer so the reflection camera ignores it
-(no feedback loop). The mirror plane is the local XY plane, facing local +Z.
+A SubViewport renders the world from a camera placed at the reflection of the
+active camera across the mirror plane. The surface samples that render by SCREEN
+position (not the mesh UVs) so it stays aligned regardless of the quad's
+orientation, with a horizontal flip to produce a mirror's lateral inversion.
+
+Visual layers let the reflection camera skip the surface itself (no feedback)
+and any node tagged "no reflection" (e.g. world-space signage text).
 """
 
-## Visual layer 19: the mirror surface, culled by the reflection camera.
+## Visual layer 19: the mirror surface, skipped by the reflection camera.
 const SURFACE_VISUAL_LAYER: int = 1 << 18
+## Visual layer 18: nodes that should not appear in mirrors (e.g. signage text).
+const NO_REFLECTION_VISUAL_LAYER: int = 1 << 17
+
+const MIRROR_SHADER: String = """
+shader_type spatial;
+render_mode unshaded;
+uniform sampler2D reflection : source_color, filter_linear;
+void fragment() {
+	// Sample the reflection render at this fragment's screen position, flipped
+	// horizontally for the lateral inversion a mirror shows.
+	vec2 uv = vec2(1.0 - SCREEN_UV.x, SCREEN_UV.y);
+	ALBEDO = texture(reflection, uv).rgb;
+}
+"""
 
 @export var surface_size: Vector2 = Vector2(2.0, 2.4)
-@export var resolution: Vector2i = Vector2i(512, 614)
 
 var _viewport: SubViewport = null
 var _mirror_cam: Camera3D = null
@@ -30,33 +46,38 @@ func _ready() -> void:
 	add_child(_surface)
 
 	_viewport = SubViewport.new()
-	_viewport.size = resolution
 	_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	_viewport.world_3d = get_world_3d()
 	add_child(_viewport)
+	_resize_viewport()
 
 	_mirror_cam = Camera3D.new()
-	# See everything except the mirror surface, so the reflection never includes
-	# the mirror itself.
-	_mirror_cam.cull_mask = 0xFFFFF & ~SURFACE_VISUAL_LAYER
+	# Skip the mirror surface (feedback) and any no-reflection-tagged nodes.
+	_mirror_cam.cull_mask = 0xFFFFF & ~SURFACE_VISUAL_LAYER & ~NO_REFLECTION_VISUAL_LAYER
 	_mirror_cam.current = true
 	_viewport.add_child(_mirror_cam)
 
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.albedo_texture = _viewport.get_texture()
-	# No UV flip: the reflection camera's basis is already laterally inverted
-	# relative to the viewer (its right vector is the viewer's left), which is the
-	# lateral inversion a mirror shows. Flipping here would double-invert and
-	# break horizontal parallax.
+	var shader := Shader.new()
+	shader.code = MIRROR_SHADER
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	material.set_shader_parameter("reflection", _viewport.get_texture())
 	_surface.material_override = material
+
+	get_viewport().size_changed.connect(_resize_viewport)
+
+func _resize_viewport() -> void:
+	# Match the screen so SCREEN_UV sampling aligns 1:1.
+	_viewport.size = Vector2i(get_viewport().get_visible_rect().size)
 
 func _process(_delta: float) -> void:
 	var main := get_viewport().get_camera_3d()
 	if main == null or _mirror_cam == null:
 		return
 
-	# Mirror plane normal is the mirror's local +Z in world space.
+	# Reflect the viewer across the mirror plane (local +Z in world space). A
+	# look_at (proper, right-handed) basis keeps face culling correct; the
+	# shader's horizontal flip supplies the mirror inversion.
 	var normal := global_transform.basis.z.normalized()
 	var distance := (main.global_position - global_position).dot(normal)
 	var reflected_pos := main.global_position - 2.0 * distance * normal
@@ -69,6 +90,8 @@ func _process(_delta: float) -> void:
 	_mirror_cam.global_position = reflected_pos
 	_mirror_cam.look_at(reflected_pos + reflected_forward, reflected_up)
 	_mirror_cam.fov = main.fov
+	_mirror_cam.near = main.near
+	_mirror_cam.far = main.far
 
 ## A simple dark border around the mirror surface (on the surface layer so the
 ## reflection camera ignores it too).
