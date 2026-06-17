@@ -148,8 +148,9 @@ func _input(event: InputEvent) -> void:
 	if Input.get_mouse_mode() != Input.MOUSE_MODE_CAPTURED:
 		return
 	if event is InputEventMouseMotion:
-		_yaw -= event.relative.x * MOUSE_SENSITIVITY
-		_pitch -= event.relative.y * MOUSE_SENSITIVITY
+		var sensitivity: float = Settings.mouse_sensitivity
+		_yaw -= event.relative.x * sensitivity
+		_pitch -= event.relative.y * sensitivity
 		# MOUSE_VERTICAL_LIMIT is in degrees; _pitch is radians.
 		var pitch_limit := deg_to_rad(MOUSE_VERTICAL_LIMIT)
 		_pitch = clamp(_pitch, -pitch_limit, pitch_limit)

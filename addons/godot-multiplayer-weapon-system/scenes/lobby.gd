@@ -10,6 +10,7 @@ Shown at startup and when disconnected. Manages connection state display.
 @onready var ip_input: LineEdit = $MenuPanel/Margin/VBox/JoinSection/IPInput
 @onready var join_button: Button = $MenuPanel/Margin/VBox/JoinSection/JoinButton
 @onready var tutorial_button: Button = $MenuPanel/Margin/VBox/TutorialButton
+@onready var settings_button: Button = $MenuPanel/Margin/VBox/SettingsButton
 @onready var disconnect_button: Button = $MenuPanel/Margin/VBox/DisconnectButton
 @onready var player_list_label: Label = $MenuPanel/Margin/VBox/PlayerListLabel
 @onready var player_list: VBoxContainer = $MenuPanel/Margin/VBox/PlayerList
@@ -28,6 +29,7 @@ func _ready() -> void:
 	host_button.pressed.connect(_on_host_pressed)
 	join_button.pressed.connect(_on_join_pressed)
 	tutorial_button.pressed.connect(_on_tutorial_pressed)
+	settings_button.pressed.connect(_on_settings_pressed)
 	host_online_button.pressed.connect(_on_host_online_pressed)
 	join_online_button.pressed.connect(_on_join_online_pressed)
 	disconnect_button.pressed.connect(_on_disconnect_pressed)
@@ -78,6 +80,9 @@ func _on_tutorial_pressed() -> void:
 	if err != OK:
 		status_label.text = "Tutorial failed to load (error %d)" % err
 		push_error("Tutorial scene failed to load: %d" % err)
+
+func _on_settings_pressed() -> void:
+	add_child(SettingsMenu.new())
 func _on_host_online_pressed() -> void:
 	var err = MultiplayerManager.host_online()
 	if err != OK:
