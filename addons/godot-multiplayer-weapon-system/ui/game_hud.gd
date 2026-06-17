@@ -64,9 +64,10 @@ func _process(_delta: float) -> void:
 func _build_ui() -> void:
 	# Bottom-left stack: grenades, equipment, health.
 	var bottom_left := VBoxContainer.new()
-	bottom_left.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT, Control.PRESET_MODE_MINSIZE, 16)
-	bottom_left.add_theme_constant_override("separation", 6)
 	add_child(bottom_left)
+	# Anchor to the bottom-left and grow up/right so it stays on screen.
+	_place(bottom_left, 0.0, 1.0, 16.0, -16.0, Control.GROW_DIRECTION_END, Control.GROW_DIRECTION_BEGIN)
+	bottom_left.add_theme_constant_override("separation", 6)
 
 	_grenades_box = HBoxContainer.new()
 	_grenades_box.add_theme_constant_override("separation", 10)
@@ -94,9 +95,9 @@ func _build_ui() -> void:
 
 	# Top-center: team scores + buy hint.
 	var top_center := VBoxContainer.new()
-	top_center.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, 12)
 	top_center.alignment = BoxContainer.ALIGNMENT_CENTER
 	add_child(top_center)
+	_place(top_center, 0.5, 0.0, 0.0, 12.0, Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_END)
 	_scores_label = Label.new()
 	_scores_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_scores_label.add_theme_font_size_override("font_size", 22)
@@ -109,17 +110,32 @@ func _build_ui() -> void:
 	# Top-right: minimap.
 	_minimap = Control.new()
 	_minimap.custom_minimum_size = Vector2(MINIMAP_SIZE, MINIMAP_SIZE)
-	_minimap.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_MINSIZE, 16)
 	_minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_minimap.draw.connect(_draw_minimap)
 	add_child(_minimap)
+	_place(_minimap, 1.0, 0.0, -16.0, 16.0, Control.GROW_DIRECTION_BEGIN, Control.GROW_DIRECTION_END)
 
 	# Center: downed / eliminated status.
 	_status_label = Label.new()
-	_status_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
 	_status_label.add_theme_font_size_override("font_size", 40)
 	_status_label.add_theme_color_override("font_color", Color(1.0, 0.4, 0.35))
 	add_child(_status_label)
+	_place(_status_label, 0.5, 0.5, 0.0, 0.0, Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH)
+
+## Anchor a control to a single point (ax, ay in 0..1) with a pixel offset, and
+## set which way it grows to fit its content. Avoids the preset/MINSIZE timing
+## pitfall where offsets get baked before children exist.
+func _place(c: Control, ax: float, ay: float, ox: float, oy: float, grow_h: int, grow_v: int) -> void:
+	c.anchor_left = ax
+	c.anchor_right = ax
+	c.anchor_top = ay
+	c.anchor_bottom = ay
+	c.offset_left = ox
+	c.offset_right = ox
+	c.offset_top = oy
+	c.offset_bottom = oy
+	c.grow_horizontal = grow_h
+	c.grow_vertical = grow_v
 
 # === Minimap ===
 

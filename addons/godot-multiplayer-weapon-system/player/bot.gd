@@ -16,8 +16,8 @@ const GRAVITY: float = 20.0
 const RESPAWN_DELAY: float = 5.0
 const FIRE_INTERVAL: float = 1.8
 const SHOT_DAMAGE: float = 6.0
-## Only engage players within this distance (so bots don't snipe you at spawn).
-const ENGAGE_RANGE: float = 28.0
+## Only engage players within this distance.
+const ENGAGE_RANGE: float = 45.0
 const FIRE_RANGE: float = 70.0
 const AIM_SPREAD: float = 0.06
 const FLASH_TIME: float = 0.06
@@ -38,6 +38,7 @@ var _flash_timer: float = 0.0
 var _hit_flash_timer: float = 0.0
 var _material: StandardMaterial3D = null
 var _spawn_position: Vector3 = Vector3.ZERO
+var _tracer: MeshInstance3D = null
 
 func _ready() -> void:
 	_spawn_position = global_position
@@ -48,6 +49,7 @@ func _ready() -> void:
 	_mesh.material_override = _material
 	_head.material_override = _material
 	_muzzle_flash.visible = false
+	_build_tracer()
 	_reset()
 
 func _physics_process(delta: float) -> void:
@@ -77,6 +79,8 @@ func _physics_process(delta: float) -> void:
 		_flash_timer -= delta
 		if _flash_timer <= 0.0:
 			_muzzle_flash.visible = false
+			if _tracer != null:
+				_tracer.visible = false
 	if _hit_flash_timer > 0.0:
 		_hit_flash_timer -= delta
 		if _hit_flash_timer <= 0.0:
@@ -154,12 +158,41 @@ func _shoot_at(target: PlayerController) -> void:
 	query.collide_with_bodies = true
 	query.exclude = [get_rid()]
 	var hit := space.intersect_ray(query)
-	if hit.is_empty():
+
+	var endpoint: Vector3 = eye_pos + dir * FIRE_RANGE
+	if not hit.is_empty():
+		endpoint = hit.get("position")
+		var collider = hit.get("collider")
+		# Only the player takes bot fire (walls/dummies/other bots block it).
+		if collider is PlayerController:
+			(collider as PlayerController).request_damage(SHOT_DAMAGE, authority_peer_id)
+	_show_tracer(eye_pos, endpoint)
+
+## Brief glowing line from the muzzle to the shot's endpoint, so it's obvious the
+## bot is firing. Hidden together with the muzzle flash.
+func _build_tracer() -> void:
+	_tracer = MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(0.05, 0.05, 1.0)
+	_tracer.mesh = box
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(1.0, 0.85, 0.3)
+	mat.emission_enabled = true
+	mat.emission = Color(1.0, 0.8, 0.2)
+	_tracer.material_override = mat
+	_tracer.top_level = true  # set world transform directly, ignoring the bot's
+	_tracer.visible = false
+	add_child(_tracer)
+
+func _show_tracer(from: Vector3, to: Vector3) -> void:
+	var length := from.distance_to(to)
+	if length < 0.2:
 		return
-	var collider = hit.get("collider")
-	# Only the player takes bot fire (walls/dummies/other bots block or are ignored).
-	if collider is PlayerController:
-		(collider as PlayerController).request_damage(SHOT_DAMAGE, authority_peer_id)
+	_tracer.global_position = (from + to) * 0.5
+	_tracer.look_at(to, Vector3.UP)
+	_tracer.scale = Vector3(1.0, 1.0, length)
+	_tracer.visible = true
 
 func _update_color() -> void:
 	_material.albedo_color = Color(0.8, 0.3, 0.3)
