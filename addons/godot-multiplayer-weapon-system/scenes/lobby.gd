@@ -11,6 +11,7 @@ Shown at startup and when disconnected. Manages connection state display.
 @onready var join_button: Button = $MenuPanel/Margin/VBox/JoinSection/JoinButton
 @onready var tutorial_button: Button = $MenuPanel/Margin/VBox/TutorialButton
 @onready var settings_button: Button = $MenuPanel/Margin/VBox/SettingsButton
+@onready var round_test_button: Button = $MenuPanel/Margin/VBox/RoundTestButton
 @onready var disconnect_button: Button = $MenuPanel/Margin/VBox/DisconnectButton
 @onready var player_list_label: Label = $MenuPanel/Margin/VBox/PlayerListLabel
 @onready var player_list: VBoxContainer = $MenuPanel/Margin/VBox/PlayerList
@@ -30,6 +31,7 @@ func _ready() -> void:
 	join_button.pressed.connect(_on_join_pressed)
 	tutorial_button.pressed.connect(_on_tutorial_pressed)
 	settings_button.pressed.connect(_on_settings_pressed)
+	round_test_button.pressed.connect(_on_round_test_pressed)
 	host_online_button.pressed.connect(_on_host_online_pressed)
 	join_online_button.pressed.connect(_on_join_online_pressed)
 	disconnect_button.pressed.connect(_on_disconnect_pressed)
@@ -83,6 +85,11 @@ func _on_tutorial_pressed() -> void:
 
 func _on_settings_pressed() -> void:
 	add_child(SettingsMenu.new())
+
+func _on_round_test_pressed() -> void:
+	# Offline harness for the round state machine (no networking needed).
+	get_tree().change_scene_to_file("res://addons/godot-multiplayer-weapon-system/scenes/round_test.tscn")
+
 func _on_host_online_pressed() -> void:
 	var err = MultiplayerManager.host_online()
 	if err != OK:
