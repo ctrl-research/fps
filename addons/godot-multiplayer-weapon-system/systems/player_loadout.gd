@@ -52,6 +52,15 @@ func add_grenade(grenade_id: String) -> void:
 func grenade_count(grenade_id: String) -> int:
 	return grenades.get(grenade_id, 0)
 
+## Consume one grenade of the given type (on throw). Emits loadout_changed.
+func use_grenade(grenade_id: String) -> void:
+	if grenade_count(grenade_id) <= 0:
+		return
+	grenades[grenade_id] = grenade_count(grenade_id) - 1
+	if grenades[grenade_id] <= 0:
+		grenades.erase(grenade_id)
+	loadout_changed.emit()
+
 ## Whether another grenade of this type can be carried (below max_inventory).
 func can_add_grenade(grenade_id: String) -> bool:
 	var data := WeaponDatabase.get_grenade(grenade_id)

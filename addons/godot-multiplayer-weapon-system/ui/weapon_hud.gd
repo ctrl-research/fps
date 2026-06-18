@@ -8,15 +8,15 @@ crosshair gap grows with the active weapon's current spread so the player gets
 direct feedback on movement and spray inaccuracy.
 """
 
-const CROSSHAIR_BASE_GAP: float = 2.0
+const CROSSHAIR_BASE_GAP: float = 5.0
 const CROSSHAIR_LENGTH: float = 6.0
 const CROSSHAIR_THICKNESS: float = 2.0
-const CROSSHAIR_MAX_GAP: float = 18.0
+const CROSSHAIR_MAX_GAP: float = 14.0
 const CROSSHAIR_COLOR: Color = Color(0.2, 1.0, 0.4, 0.9)
 
-## Radians of spread mapped to crosshair-gap pixels. Kept small so the reticle
-## stays tight near the centre and only opens up modestly while moving/spraying.
-const SPREAD_TO_PIXELS: float = 500.0
+## Radians of spread mapped to crosshair-gap pixels. Small, so the reticle sits a
+## few pixels off centre and only opens up slightly while moving/spraying.
+const SPREAD_TO_PIXELS: float = 40.0
 
 var _controller: WeaponController = null
 var _crosshair: Control = null

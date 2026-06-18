@@ -133,10 +133,10 @@ func _build_signs() -> void:
 		_key_for("jump"), _key_for("sprint"), _key_for("crouch")]
 	_add_sign(Vector3(8.0, 3.2, 7.5), movement, 56, Color(0.7, 0.9, 1.0))
 
-	var combat := "COMBAT\nFire %s · Reload %s\nPrimary %s · Secondary %s\nLoadout %s" % [
-		_key_for("shoot"), _key_for("reload"), _key_for("weapon_primary"),
-		_key_for("weapon_secondary"), _key_for("buy")]
-	_add_sign(Vector3(0.0, 3.2, 4.0), combat, 56, Color(1.0, 0.8, 0.7))
+	var combat := "COMBAT\nFire %s · Reload %s · Grenade %s\nPrimary %s · Secondary %s · Loadout %s" % [
+		_key_for("shoot"), _key_for("reload"), _key_for("grenade"),
+		_key_for("weapon_primary"), _key_for("weapon_secondary"), _key_for("buy")]
+	_add_sign(Vector3(0.0, 3.2, 4.0), combat, 52, Color(1.0, 0.8, 0.7))
 
 	_add_sign(Vector3(0.0, 3.2, -26.0),
 		"FIRING RANGE\nTargets respawn · Free loadout (%s)" % _key_for("buy"),
