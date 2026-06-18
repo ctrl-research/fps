@@ -10,6 +10,7 @@ Shown at startup and when disconnected. Manages connection state display.
 @onready var ip_input: LineEdit = $MenuPanel/Margin/VBox/JoinSection/IPInput
 @onready var join_button: Button = $MenuPanel/Margin/VBox/JoinSection/JoinButton
 @onready var tutorial_button: Button = $MenuPanel/Margin/VBox/TutorialButton
+@onready var gun_game_button: Button = $MenuPanel/Margin/VBox/GunGameButton
 @onready var settings_button: Button = $MenuPanel/Margin/VBox/SettingsButton
 @onready var round_test_button: Button = $MenuPanel/Margin/VBox/RoundTestButton
 @onready var disconnect_button: Button = $MenuPanel/Margin/VBox/DisconnectButton
@@ -30,6 +31,7 @@ func _ready() -> void:
 	host_button.pressed.connect(_on_host_pressed)
 	join_button.pressed.connect(_on_join_pressed)
 	tutorial_button.pressed.connect(_on_tutorial_pressed)
+	gun_game_button.pressed.connect(_on_gun_game_pressed)
 	settings_button.pressed.connect(_on_settings_pressed)
 	round_test_button.pressed.connect(_on_round_test_pressed)
 	host_online_button.pressed.connect(_on_host_online_pressed)
@@ -82,6 +84,10 @@ func _on_tutorial_pressed() -> void:
 	if err != OK:
 		status_label.text = "Tutorial failed to load (error %d)" % err
 		push_error("Tutorial scene failed to load: %d" % err)
+
+func _on_gun_game_pressed() -> void:
+	# Offline FFA vs bots — no networking needed.
+	get_tree().change_scene_to_file("res://addons/godot-multiplayer-weapon-system/scenes/gun_game.tscn")
 
 func _on_settings_pressed() -> void:
 	add_child(SettingsMenu.new())

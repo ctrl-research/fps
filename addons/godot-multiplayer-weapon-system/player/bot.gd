@@ -8,6 +8,10 @@ and respawns after 5 seconds, and periodically fires at the nearest living
 player with a chance to miss. Stationary — it only turns to face its target.
 """
 
+## Emitted when the bot is defeated; carries the attacker's peer id (for kill
+## attribution, e.g. Gun Game progression).
+signal defeated(by_peer_id: int)
+
 @export var max_health: float = 100.0
 ## Odd id so the minimap colours the bot as the enemy team (peer_id % 2 == 1).
 @export var authority_peer_id: int = 1001
@@ -38,6 +42,7 @@ var _flash_timer: float = 0.0
 var _hit_flash_timer: float = 0.0
 var _material: StandardMaterial3D = null
 var _spawn_position: Vector3 = Vector3.ZERO
+var _last_attacker_id: int = 0
 var _tracer: MeshInstance3D = null
 
 func _ready() -> void:
@@ -87,9 +92,10 @@ func _physics_process(delta: float) -> void:
 			_update_color()
 
 ## Weapon hit entry point (same signature as PlayerController.request_damage).
-func request_damage(amount: float, _attacker_id: int) -> void:
+func request_damage(amount: float, attacker_id: int) -> void:
 	if _dead or amount <= 0.0:
 		return
+	_last_attacker_id = attacker_id
 	health = max(health - amount, 0.0)
 	_label.text = "%d" % int(health)
 	_material.albedo_color = Color(1.0, 1.0, 1.0)
@@ -105,6 +111,7 @@ func _die() -> void:
 	_muzzle_flash.visible = false
 	_label.text = "respawning…"
 	_collision.set_deferred("disabled", true)
+	defeated.emit(_last_attacker_id)
 
 func _reset() -> void:
 	_dead = false
