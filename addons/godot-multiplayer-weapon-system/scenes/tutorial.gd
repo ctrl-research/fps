@@ -251,8 +251,10 @@ func _build_bots() -> void:
 	for pos in BOT_POSITIONS:
 		var bot: Bot = scene.instantiate()
 		bot.authority_peer_id = 1001 + index * 2  # distinct odd ids = enemy team
+		# Set position BEFORE add_child so the bot's _ready captures the correct
+		# spawn point (it respawns there after being defeated).
+		bot.position = pos
 		add_child(bot)
-		bot.global_position = pos
 		index += 1
 
 	_add_sign(Vector3(-13.0, 2.6, -14.0), "BOT ARENA\nEnter the doorway to engage · respawn 5s", 44, Color(1.0, 0.7, 0.6))

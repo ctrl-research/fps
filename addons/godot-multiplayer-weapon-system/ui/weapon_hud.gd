@@ -1,4 +1,5 @@
 extends CanvasLayer
+class_name WeaponHud
 """
 Minimal in-combat weapon HUD: a dynamic crosshair plus weapon/ammo readout.
 
@@ -7,12 +8,15 @@ crosshair gap grows with the active weapon's current spread so the player gets
 direct feedback on movement and spray inaccuracy.
 """
 
-const CROSSHAIR_BASE_GAP: float = 6.0
-const CROSSHAIR_LENGTH: float = 8.0
+const CROSSHAIR_BASE_GAP: float = 2.0
+const CROSSHAIR_LENGTH: float = 6.0
 const CROSSHAIR_THICKNESS: float = 2.0
+const CROSSHAIR_MAX_GAP: float = 18.0
+const CROSSHAIR_COLOR: Color = Color(0.2, 1.0, 0.4, 0.9)
 
-## Radians of spread mapped to one screen pixel of crosshair gap.
-const SPREAD_TO_PIXELS: float = 2200.0
+## Radians of spread mapped to crosshair-gap pixels. Kept small so the reticle
+## stays tight near the centre and only opens up modestly while moving/spraying.
+const SPREAD_TO_PIXELS: float = 500.0
 
 var _controller: WeaponController = null
 var _crosshair: Control = null
@@ -59,18 +63,37 @@ func _make_label(offset: Vector2) -> Label:
 	return label
 
 func _draw_crosshair() -> void:
-	var size := _crosshair.size
-	var center := size * 0.5
+	var center := _crosshair.size * 0.5
 	var gap := CROSSHAIR_BASE_GAP
 	if _controller:
 		gap += _controller.current_spread() * SPREAD_TO_PIXELS
-	var color := Color(0.2, 1.0, 0.4, 0.9)
+	gap = minf(gap, CROSSHAIR_MAX_GAP)
+
+	match Settings.crosshair_style:
+		1:  # Dot
+			_crosshair.draw_circle(center, 2.5, CROSSHAIR_COLOR)
+		2:  # Circle
+			_crosshair.draw_arc(center, gap + 4.0, 0.0, TAU, 32, CROSSHAIR_COLOR, CROSSHAIR_THICKNESS, true)
+			_crosshair.draw_circle(center, 1.5, CROSSHAIR_COLOR)
+		3:  # X
+			_draw_x(center, gap)
+		4:  # Star (cross + X)
+			_draw_cross(center, gap)
+			_draw_x(center, gap)
+		_:  # Cross (default)
+			_draw_cross(center, gap)
+
+func _draw_cross(center: Vector2, gap: float) -> void:
 	var half := CROSSHAIR_THICKNESS * 0.5
-	# Left / right / top / bottom ticks.
-	_crosshair.draw_rect(Rect2(center.x - gap - CROSSHAIR_LENGTH, center.y - half, CROSSHAIR_LENGTH, CROSSHAIR_THICKNESS), color)
-	_crosshair.draw_rect(Rect2(center.x + gap, center.y - half, CROSSHAIR_LENGTH, CROSSHAIR_THICKNESS), color)
-	_crosshair.draw_rect(Rect2(center.x - half, center.y - gap - CROSSHAIR_LENGTH, CROSSHAIR_THICKNESS, CROSSHAIR_LENGTH), color)
-	_crosshair.draw_rect(Rect2(center.x - half, center.y + gap, CROSSHAIR_THICKNESS, CROSSHAIR_LENGTH), color)
+	_crosshair.draw_rect(Rect2(center.x - gap - CROSSHAIR_LENGTH, center.y - half, CROSSHAIR_LENGTH, CROSSHAIR_THICKNESS), CROSSHAIR_COLOR)
+	_crosshair.draw_rect(Rect2(center.x + gap, center.y - half, CROSSHAIR_LENGTH, CROSSHAIR_THICKNESS), CROSSHAIR_COLOR)
+	_crosshair.draw_rect(Rect2(center.x - half, center.y - gap - CROSSHAIR_LENGTH, CROSSHAIR_THICKNESS, CROSSHAIR_LENGTH), CROSSHAIR_COLOR)
+	_crosshair.draw_rect(Rect2(center.x - half, center.y + gap, CROSSHAIR_THICKNESS, CROSSHAIR_LENGTH), CROSSHAIR_COLOR)
+
+func _draw_x(center: Vector2, gap: float) -> void:
+	for d in [Vector2(1, 1), Vector2(1, -1), Vector2(-1, 1), Vector2(-1, -1)]:
+		var dir: Vector2 = d.normalized()
+		_crosshair.draw_line(center + dir * gap, center + dir * (gap + CROSSHAIR_LENGTH), CROSSHAIR_COLOR, CROSSHAIR_THICKNESS)
 
 func _on_weapon_changed(weapon: Weapon) -> void:
 	_weapon_label.text = weapon.display_name()
