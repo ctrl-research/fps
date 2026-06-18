@@ -66,6 +66,9 @@ var team_scores: Dictionary = {0: 0, 1: 0}
 ## Player credits [peer_id] = credits
 var player_credits: Dictionary = {}
 
+## Per-player eliminations this match, [peer_id] = kills (for the scoreboard).
+var player_kills: Dictionary = {}
+
 ## Starting credits for each round
 const STARTING_CREDITS: int = 800
 
@@ -351,6 +354,7 @@ func reset_match() -> void:
 	match_winner = -1
 	sides_swapped = false
 	_alive.clear()
+	player_kills.clear()
 	for peer_id in player_credits.keys():
 		player_credits[peer_id] = STARTING_CREDITS
 		player_credits_changed.emit(peer_id, STARTING_CREDITS)
@@ -392,6 +396,7 @@ func _resolve_death(victim_id: int, killer_id: int) -> void:
 	if killer_id != victim_id and player_credits.has(killer_id) \
 			and _get_player_team(killer_id) != _get_player_team(victim_id):
 		add_player_credits(killer_id, CREDIT_REWARD_ELIMINATION)
+		player_kills[killer_id] = player_kills.get(killer_id, 0) + 1
 	_check_elimination()
 
 ## End the round if one team has no living players left.

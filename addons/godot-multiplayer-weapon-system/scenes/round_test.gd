@@ -17,9 +17,16 @@ var _info: Label = null
 
 func _ready() -> void:
 	_build_ui()
+	GameState.match_ended.connect(_on_match_ended)
 	for peer_id in FAKE_PEERS:
 		GameState.on_peer_joined(peer_id)
 	GameState.start_match()
+
+func _on_match_ended(_winning_team: int) -> void:
+	# Show the same results overlay the real game uses, from peer 1's perspective.
+	var screen := MatchEndScreen.new()
+	add_child(screen)
+	screen.show_result(GameState._get_player_team(1))
 
 func _process(_delta: float) -> void:
 	_info.text = _state_text()
@@ -73,6 +80,7 @@ func _build_ui() -> void:
 	_add_button(vbox, "Team 1 wins round", func() -> void: GameState.end_round(1))
 	_add_button(vbox, "Eliminate Team 0 (team 1 wins)", func() -> void: _eliminate(0))
 	_add_button(vbox, "Eliminate Team 1 (team 0 wins)", func() -> void: _eliminate(1))
+	_add_button(vbox, "Match point (7-7)", func() -> void: _match_point())
 	_add_button(vbox, "New match", func() -> void: GameState.start_match())
 	_add_button(vbox, "Back to menu", func() -> void: get_tree().change_scene_to_file(MAIN_SCENE))
 
@@ -81,6 +89,14 @@ func _add_button(parent: VBoxContainer, text: String, on_pressed: Callable) -> v
 	button.text = text
 	button.pressed.connect(on_pressed)
 	parent.add_child(button)
+
+## Put both teams one round from winning, so the next round win ends the match.
+func _match_point() -> void:
+	var edge: int = GameState.ROUNDS_TO_WIN - 1
+	GameState.team_scores[0] = edge
+	GameState.team_scores[1] = edge
+	GameState.emit_signal("team_score_updated", 0, edge)
+	GameState.emit_signal("team_score_updated", 1, edge)
 
 ## Simulate every player on `team` being downed, which should end the round.
 func _eliminate(team: int) -> void:
