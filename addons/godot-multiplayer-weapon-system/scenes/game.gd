@@ -9,6 +9,14 @@ Instantiated when the host starts a round.
 func _ready() -> void:
 	# Ensure environment is set up
 	_setup_environment()
+	GameState.match_ended.connect(_on_match_ended)
+
+func _on_match_ended(_winning_team: int) -> void:
+	# Show the results overlay for whichever team the local player is on.
+	var local_team := GameState._get_player_team(GameState._local_peer_id())
+	var screen := MatchEndScreen.new()
+	add_child(screen)
+	screen.show_result(local_team)
 
 func _setup_environment() -> void:
 	var env = Environment.new()
