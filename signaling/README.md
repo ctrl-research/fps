@@ -31,8 +31,43 @@ sent to the **source peer id**, so the recipient knows who it came from.
 |---------|---------|---------|
 | `PORT` | `9080` | Listen port (plain ws) |
 | `MAX_PEERS` | `10` | Max peers per room |
+| `MAX_ROOMS` | `1000` | Max concurrent rooms (caps room-creation spam) |
+| `MAX_CONNECTIONS_PER_IP` | `20` | Max simultaneous connections from one source IP |
+| `MAX_MESSAGES_PER_SEC` | `30` | Per-connection message rate; exceeding it closes the socket |
+| `MAX_MESSAGE_BYTES` | `32768` | Max frame size (signaling is tiny; SDP a few KB) |
+| `JOIN_TIMEOUT_MS` | `10000` | Drop a connection that never joins a room within this window |
+| `HEARTBEAT_MS` | `30000` | Ping interval for reaping dead connections |
+| `ALLOWED_ORIGINS` | _(empty = any)_ | Comma-separated browser `Origin` allowlist, e.g. `https://ctrl-research.github.io`. Native (non-browser) clients send no Origin and are always allowed. |
 
 Health check: `GET /health` → `200 ok` (also `GET /`).
+
+## Security notes
+
+The broker holds **no accounts, no persistence, and no game data** (traffic is P2P), so
+the realistic threat is **abuse / denial-of-service**. Mitigations baked in:
+
+- **Frame-size, per-IP connection, room-count, and message-rate limits** (above) bound
+  what one client/IP can consume.
+- **Join timeout** drops sockets that connect but never join.
+- **Relay whitelisting** — only known handshake fields are forwarded and the source peer
+  id is server-set, so peers can't spoof identity or smuggle arbitrary data.
+- **Origin allowlist** (`ALLOWED_ORIGINS`) blocks casual cross-site browser connections.
+- **Handler/exception guards** keep one bad client from crashing the process.
+
+Still **your responsibility at deploy time**:
+
+- **Terminate TLS at a reverse proxy and do _not_ expose the raw `ws://` port** to the
+  internet — browsers on HTTPS require `wss://`. Firewall the broker port so only the
+  proxy reaches it. (Behind a proxy, set `X-Forwarded-For` so the per-IP cap sees real
+  client IPs — Caddy does this by default.)
+- Run under a restart policy (Docker `--restart` / systemd `Restart=always`) as a backstop.
+
+### A note on player IP exposure (inherent to P2P)
+
+Because game traffic is true peer-to-peer, players' public IPs are visible to each other
+during the WebRTC handshake. To hide them you'd route traffic through a **TURN relay**
+(extra bandwidth cost, and it partly defeats the free-P2P benefit). Acceptable for a
+casual game, but a conscious trade-off.
 
 ## Run it
 
