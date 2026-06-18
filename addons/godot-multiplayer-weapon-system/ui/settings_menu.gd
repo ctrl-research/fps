@@ -14,6 +14,7 @@ signal closed()
 var _rebind_buttons: Dictionary = {}  # action -> Button
 var _listening_action: String = ""
 var _sensitivity_value_label: Label = null
+var _volume_value_label: Label = null
 
 func _ready() -> void:
 	layer = 20
@@ -82,6 +83,42 @@ func _build_ui() -> void:
 	minimap_check.button_pressed = Settings.minimap_rotates
 	minimap_check.toggled.connect(Settings.set_minimap_rotates)
 	minimap_row.add_child(minimap_check)
+
+	# Master volume.
+	var volume_row := HBoxContainer.new()
+	volume_row.add_theme_constant_override("separation", 12)
+	vbox.add_child(volume_row)
+	var volume_label := Label.new()
+	volume_label.text = "Master Volume"
+	volume_label.custom_minimum_size = Vector2(200, 0)
+	volume_row.add_child(volume_label)
+	var volume_slider := HSlider.new()
+	volume_slider.min_value = 0.0
+	volume_slider.max_value = 1.0
+	volume_slider.step = 0.05
+	volume_slider.value = Settings.master_volume
+	volume_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	volume_row.add_child(volume_slider)
+	_volume_value_label = Label.new()
+	_volume_value_label.custom_minimum_size = Vector2(56, 0)
+	_volume_value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	volume_row.add_child(_volume_value_label)
+	volume_slider.value_changed.connect(_on_volume_changed)
+
+	# Crosshair shape.
+	var crosshair_row := HBoxContainer.new()
+	crosshair_row.add_theme_constant_override("separation", 12)
+	vbox.add_child(crosshair_row)
+	var crosshair_label := Label.new()
+	crosshair_label.text = "Crosshair"
+	crosshair_label.custom_minimum_size = Vector2(200, 0)
+	crosshair_row.add_child(crosshair_label)
+	var crosshair_option := OptionButton.new()
+	for style_name in Settings.CROSSHAIR_STYLES:
+		crosshair_option.add_item(style_name)
+	crosshair_option.selected = Settings.crosshair_style
+	crosshair_option.item_selected.connect(Settings.set_crosshair_style)
+	crosshair_row.add_child(crosshair_option)
 
 	var hint := Label.new()
 	hint.text = "Click a binding, then press a key or mouse button (Esc to cancel)."
@@ -164,6 +201,10 @@ func _on_sensitivity_changed(value: float) -> void:
 	Settings.set_mouse_sensitivity(value)
 	_update_sensitivity_label()
 
+func _on_volume_changed(value: float) -> void:
+	Settings.set_master_volume(value)
+	_update_volume_label()
+
 func _on_reset_pressed() -> void:
 	Settings.reset_to_defaults()
 	_refresh()
@@ -176,7 +217,12 @@ func _refresh() -> void:
 	for action in _rebind_buttons:
 		_rebind_buttons[action].text = Settings.binding_label(action)
 	_update_sensitivity_label()
+	_update_volume_label()
 
 func _update_sensitivity_label() -> void:
 	if _sensitivity_value_label:
 		_sensitivity_value_label.text = "%.1f" % (Settings.mouse_sensitivity * 1000.0)
+
+func _update_volume_label() -> void:
+	if _volume_value_label:
+		_volume_value_label.text = "%d%%" % int(round(Settings.master_volume * 100.0))

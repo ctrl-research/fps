@@ -14,6 +14,10 @@ const CONFIG_PATH: String = "user://settings.cfg"
 const DEFAULT_MOUSE_SENSITIVITY: float = 0.003
 const MIN_MOUSE_SENSITIVITY: float = 0.0005
 const MAX_MOUSE_SENSITIVITY: float = 0.02
+const DEFAULT_MASTER_VOLUME: float = 0.75
+
+## Crosshair shapes, in dropdown order (index stored as crosshair_style).
+const CROSSHAIR_STYLES: Array[String] = ["Cross", "Dot", "Circle", "X", "Star"]
 
 ## Actions exposed in the rebinding UI, in display order.
 const BINDABLE_ACTIONS: Array[String] = [
@@ -41,6 +45,10 @@ const ACTION_LABELS: Dictionary = {
 var mouse_sensitivity: float = DEFAULT_MOUSE_SENSITIVITY
 ## When true, the minimap rotates with the player's view (border stays fixed).
 var minimap_rotates: bool = false
+## Master output volume, 0..1 (applied to the Master audio bus).
+var master_volume: float = DEFAULT_MASTER_VOLUME
+## Index into CROSSHAIR_STYLES.
+var crosshair_style: int = 0
 
 # Default events captured from the project InputMap at boot, used by reset.
 var _default_events: Dictionary = {}
@@ -48,6 +56,7 @@ var _default_events: Dictionary = {}
 func _ready() -> void:
 	_capture_defaults()
 	_load()
+	_apply_volume()
 
 func _capture_defaults() -> void:
 	for action in BINDABLE_ACTIONS:
@@ -82,6 +91,25 @@ func set_minimap_rotates(value: bool) -> void:
 	save()
 	settings_changed.emit()
 
+func set_master_volume(value: float) -> void:
+	master_volume = clampf(value, 0.0, 1.0)
+	_apply_volume()
+	save()
+	settings_changed.emit()
+
+func set_crosshair_style(index: int) -> void:
+	crosshair_style = clampi(index, 0, CROSSHAIR_STYLES.size() - 1)
+	save()
+	settings_changed.emit()
+
+## Apply the master volume to the Master audio bus (mute at zero to avoid -inf dB).
+func _apply_volume() -> void:
+	var bus := AudioServer.get_bus_index("Master")
+	if bus < 0:
+		bus = 0
+	AudioServer.set_bus_mute(bus, master_volume <= 0.001)
+	AudioServer.set_bus_volume_db(bus, linear_to_db(maxf(master_volume, 0.001)))
+
 ## Human-readable label for an action's first bound key / mouse button.
 func binding_label(action: String) -> String:
 	if not InputMap.has_action(action):
@@ -106,6 +134,8 @@ func save() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("input", "mouse_sensitivity", mouse_sensitivity)
 	cfg.set_value("options", "minimap_rotates", minimap_rotates)
+	cfg.set_value("audio", "master_volume", master_volume)
+	cfg.set_value("options", "crosshair_style", crosshair_style)
 	for action in BINDABLE_ACTIONS:
 		if not InputMap.has_action(action):
 			continue
@@ -126,6 +156,8 @@ func _load() -> void:
 		return
 	mouse_sensitivity = cfg.get_value("input", "mouse_sensitivity", DEFAULT_MOUSE_SENSITIVITY)
 	minimap_rotates = cfg.get_value("options", "minimap_rotates", false)
+	master_volume = cfg.get_value("audio", "master_volume", DEFAULT_MASTER_VOLUME)
+	crosshair_style = cfg.get_value("options", "crosshair_style", 0)
 	if not cfg.has_section("keys"):
 		return
 	for action in cfg.get_section_keys("keys"):
