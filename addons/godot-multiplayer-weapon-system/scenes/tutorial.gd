@@ -36,6 +36,7 @@ const SPAWN: Vector3 = Vector3(0.0, 1.5, 8.0)
 
 var _player: PlayerController = null
 var _pause_menu: PauseMenu = null
+var _buy_menu = null
 
 func _ready() -> void:
 	_build_environment()
@@ -50,7 +51,13 @@ func _ready() -> void:
 	_build_hud_overlay()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("disconnect_network"):
+	if not event.is_action_pressed("disconnect_network"):
+		return
+	# Esc priority: close the buy menu first if it's open, otherwise toggle the
+	# in-game (pause) menu.
+	if is_instance_valid(_buy_menu) and _buy_menu.is_open():
+		_buy_menu.close_menu()
+	else:
 		_toggle_pause()
 
 ## Esc opens the in-game menu (Resume / Settings / Leave); pressing it again
@@ -277,9 +284,9 @@ func _setup_loadout_station() -> void:
 	GameState.round_timer = 1.0e9
 	GameState.player_credits[GameState._local_peer_id()] = SANDBOX_CREDITS
 
-	var buy_menu = load(BUY_MENU_SCENE).instantiate()
-	add_child(buy_menu)
-	buy_menu.enable_sandbox_mode()
+	_buy_menu = load(BUY_MENU_SCENE).instantiate()
+	add_child(_buy_menu)
+	_buy_menu.enable_sandbox_mode()
 
 func _build_hud_overlay() -> void:
 	var layer := CanvasLayer.new()

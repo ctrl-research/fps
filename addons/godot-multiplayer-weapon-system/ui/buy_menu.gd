@@ -65,6 +65,13 @@ func _close() -> void:
 	visible = false
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
+## Public accessors so callers (e.g. the tutorial's Esc handler) can query/close.
+func is_open() -> bool:
+	return visible
+
+func close_menu() -> void:
+	_close()
+
 func _on_ready_pressed() -> void:
 	GameState.request_ready()
 
