@@ -60,6 +60,11 @@ var _reloading: bool = false
 var _reload_timer: float = 0.0
 var _recoil_accum: float = 0.0
 
+# Grenade cooking (hold to cook, release to throw).
+var _cooking: bool = false
+var _cook_time: float = 0.0
+var _cook_grenade_id: String = ""
+
 var _muzzle: Node3D = null
 var _flash_mesh: MeshInstance3D = null
 var _flash_light: OmniLight3D = null
@@ -102,6 +107,11 @@ func _process(delta: float) -> void:
 		if _reload_timer <= 0.0:
 			_complete_reload()
 
+	if _cooking:
+		_cook_time += delta
+		if _cook_time >= Grenade.FUSE_TIME:
+			_release_grenade()  # held too long — cooks off on throw
+
 	_recover_recoil(delta)
 	_handle_input()
 
@@ -124,7 +134,9 @@ func _handle_input() -> void:
 		_start_reload()
 
 	if Input.is_action_just_pressed("grenade"):
-		_throw_grenade()
+		_begin_cook()
+	if Input.is_action_just_released("grenade"):
+		_release_grenade()
 
 	var weapon := _active()
 	if weapon == null:
@@ -137,12 +149,25 @@ func _handle_input() -> void:
 
 # === Grenades ===
 
-## Throw the first grenade type the player is carrying, if any.
-func _throw_grenade() -> void:
-	if _camera == null:
+## Press starts cooking the first grenade carried; release throws it with the
+## fuse already counted down. Holding past the full fuse cooks it off.
+func _begin_cook() -> void:
+	if _cooking:
 		return
 	var grenade_id := _first_available_grenade()
 	if grenade_id == "":
+		return
+	_cooking = true
+	_cook_time = 0.0
+	_cook_grenade_id = grenade_id
+
+func _release_grenade() -> void:
+	if not _cooking:
+		return
+	_cooking = false
+	var grenade_id := _cook_grenade_id
+	_cook_grenade_id = ""
+	if _camera == null or PlayerLoadout.grenades.get(grenade_id, 0) <= 0:
 		return
 	var data := WeaponDatabase.get_grenade(grenade_id)
 	PlayerLoadout.use_grenade(grenade_id)
@@ -154,7 +179,7 @@ func _throw_grenade() -> void:
 	grenade.position = _camera.global_position + forward * 0.6
 	var world := _player.get_parent() if _player else get_tree().current_scene
 	world.add_child(grenade)
-	grenade.throw_from(data, _peer_id(), forward)
+	grenade.throw_from(data, _peer_id(), forward, maxf(Grenade.FUSE_TIME - _cook_time, 0.05))
 
 func _first_available_grenade() -> String:
 	for grenade_id in PlayerLoadout.grenades:

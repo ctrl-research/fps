@@ -76,11 +76,15 @@ var _pitch: float = 0.0
 # === Combat ===
 ## Seconds in the downed state before bleeding out.
 const DOWNED_DURATION: float = 10.0
+## How quickly grenade knockback decays (m/s per second).
+const KNOCKBACK_DECAY: float = 18.0
 
 var health: float = 100.0
 var is_dead: bool = false
 var is_downed: bool = false
 var bleedout_timer: float = 0.0
+var emp_timer: float = 0.0
+var _knockback: Vector3 = Vector3.ZERO
 var _weapon_controller: WeaponController = null
 
 func _ready() -> void:
@@ -196,6 +200,9 @@ func _physics_process(delta: float) -> void:
 		rotation = sync_rotation
 		return
 
+	if emp_timer > 0.0:
+		emp_timer -= delta
+
 	if is_dead:
 		return
 
@@ -276,9 +283,11 @@ func _handle_movement(delta: float) -> void:
 	var direction := Basis(Vector3.UP, _yaw) * input_dir
 	if direction.length() > 1.0:
 		direction = direction.normalized()
-	velocity.x = direction.x * _current_speed
-	velocity.z = direction.z * _current_speed
+	# Add (decaying) grenade knockback on top of input movement.
+	velocity.x = direction.x * _current_speed + _knockback.x
+	velocity.z = direction.z * _current_speed + _knockback.z
 	velocity.y = _velocity_y
+	_knockback = _knockback.move_toward(Vector3.ZERO, KNOCKBACK_DECAY * delta)
 
 	# Apply movement
 	move_and_slide()
@@ -434,3 +443,46 @@ func _local_peer() -> int:
 	if multiplayer.multiplayer_peer == null:
 		return 1
 	return multiplayer.get_unique_id()
+
+# === Grenade effects ===
+# These guard on multiplayer authority so they only affect the player on their
+# own machine (avoids, e.g., flashing the thrower's screen). Cross-peer routing
+# for online play is a follow-up; offline/tutorial applies directly.
+
+## Knockback impulse (push grenade). Decays via _knockback in movement.
+func apply_knockback(impulse: Vector3) -> void:
+	if not is_multiplayer_authority():
+		return
+	_knockback += Vector3(impulse.x, 0.0, impulse.z)
+	_velocity_y += maxf(impulse.y, 0.0)
+
+## Whether utility (scope/mobility) is currently EMP-disabled.
+func is_emp_disabled() -> bool:
+	return emp_timer > 0.0
+
+## EMP: disable utility for `seconds` and show a brief screen tint.
+func apply_emp(seconds: float) -> void:
+	if not is_multiplayer_authority():
+		return
+	emp_timer = maxf(emp_timer, seconds)
+	_show_screen_overlay(Color(0.4, 0.6, 1.0, 0.35), seconds, 50)
+
+## Flashbang: full white screen overlay that fades over `seconds`.
+func apply_flash(seconds: float) -> void:
+	if not is_multiplayer_authority():
+		return
+	_show_screen_overlay(Color(1.0, 1.0, 1.0, 1.0), maxf(seconds, 0.1), 60)
+
+## Build a fading fullscreen ColorRect overlay (used by flash and EMP).
+func _show_screen_overlay(color: Color, seconds: float, layer_index: int) -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = layer_index
+	var rect := ColorRect.new()
+	rect.color = color
+	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(rect)
+	add_child(layer)
+	var tween := create_tween()
+	tween.tween_property(rect, "color:a", 0.0, seconds)
+	tween.tween_callback(layer.queue_free)
