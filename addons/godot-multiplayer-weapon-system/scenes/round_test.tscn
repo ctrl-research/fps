@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://round_test_scene"]
+
+[ext_resource type="Script" path="res://addons/godot-multiplayer-weapon-system/scenes/round_test.gd" id="1"]
+
+[node name="RoundTest" type="CanvasLayer"]
+script = ExtResource("1")

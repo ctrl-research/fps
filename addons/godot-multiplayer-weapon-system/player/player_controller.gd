@@ -85,6 +85,7 @@ var is_downed: bool = false
 var bleedout_timer: float = 0.0
 var emp_timer: float = 0.0
 var _knockback: Vector3 = Vector3.ZERO
+var _last_attacker_id: int = 0
 var _weapon_controller: WeaponController = null
 
 func _ready() -> void:
@@ -386,9 +387,10 @@ func _receive_damage(amount: float, attacker_id: int) -> void:
 	_apply_damage(amount, attacker_id)
 
 ## Owner-side damage application followed by a health broadcast.
-func _apply_damage(amount: float, _attacker_id: int) -> void:
+func _apply_damage(amount: float, attacker_id: int) -> void:
 	if is_dead or is_downed or amount <= 0.0:
 		return
+	_last_attacker_id = attacker_id
 	health = max(health - amount, 0.0)
 	health_changed.emit(health, max_health)
 	_broadcast_health()
@@ -399,6 +401,8 @@ func _enter_downed() -> void:
 	is_downed = true
 	bleedout_timer = DOWNED_DURATION
 	downed.emit()
+	# Report to the round machine (host-authoritative; no-op outside a live round).
+	GameState.report_death(authority_peer_id, _last_attacker_id)
 
 func _bleed_out() -> void:
 	is_downed = false
