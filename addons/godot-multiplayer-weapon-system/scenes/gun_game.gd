@@ -36,7 +36,6 @@ var _bot_levels: Dictionary = {}  # peer_id -> int
 var _over: bool = false
 
 var _level_label: Label = null
-var _banner: Label = null
 
 func _ready() -> void:
 	# Neutralise the round machine so it doesn't tick / show the buy hint.
@@ -149,7 +148,7 @@ func _player_scored() -> void:
 		return
 	_player_level += 1
 	if _player_level >= LADDER.size():
-		_declare_winner("YOU WIN!")
+		_declare_winner("VICTORY", true)
 	else:
 		_equip_for_level()
 
@@ -158,7 +157,7 @@ func _bot_scored(peer_id: int) -> void:
 		return
 	_bot_levels[peer_id] += 1
 	if _bot_levels[peer_id] >= LADDER.size():
-		_declare_winner("A BOT WINS — better luck next round")
+		_declare_winner("DEFEAT", false)
 
 func _equip_for_level() -> void:
 	PlayerLoadout.primary_weapon = LADDER[_player_level]
@@ -166,11 +165,31 @@ func _equip_for_level() -> void:
 	PlayerLoadout.loadout_changed.emit()
 	_update_level_label()
 
-func _declare_winner(text: String) -> void:
+func _declare_winner(title: String, player_won: bool) -> void:
 	_over = true
-	_banner.text = "%s\nPress Esc for the menu" % text
-	_banner.visible = true
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+
+	var screen := MatchEndScreen.new()
+	add_child(screen)
+	var subtitle := "Gun Game — first to clear the ladder (%d kills)" % LADDER.size()
+	screen.show_custom(title, player_won, subtitle, ["Player", "Kills", "Weapon"], _scoreboard_rows())
+
+## FFA scoreboard rows (player + bots), sorted by kills (= ladder level) desc.
+func _scoreboard_rows() -> Array:
+	var entries: Array = [{"name": "You", "kills": _player_level}]
+	var index := 1
+	for peer_id in _bot_levels:
+		entries.append({"name": "Bot %d" % index, "kills": _bot_levels[peer_id]})
+		index += 1
+	entries.sort_custom(func(a, b): return a["kills"] > b["kills"])
+
+	var rows: Array = []
+	for entry in entries:
+		var kills: int = entry["kills"]
+		var weapon := "— finished —" if kills >= LADDER.size() else \
+			WeaponDatabase.get_weapon(LADDER[kills]).get("name", LADDER[kills])
+		rows.append([entry["name"], str(kills), weapon])
+	return rows
 
 # === HUD ===
 
@@ -188,14 +207,6 @@ func _build_hud() -> void:
 	_level_label.add_theme_font_size_override("font_size", 20)
 	_level_label.add_theme_color_override("font_color", Color(1.0, 0.95, 0.6))
 	layer.add_child(_level_label)
-
-	_banner = Label.new()
-	_banner.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_banner.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_banner.add_theme_font_size_override("font_size", 48)
-	_banner.visible = false
-	layer.add_child(_banner)
 
 func _update_level_label() -> void:
 	var weapon_name: String = WeaponDatabase.get_weapon(LADDER[_player_level]).get("name", LADDER[_player_level])
