@@ -206,6 +206,53 @@ current spread, alongside a weapon/ammo/reload readout.
 
 ---
 
+## Game Modes
+
+The game targets the casual "play-with-friends" niche: low ramp-up, constant
+action, comeback potential, and **quick matches (< 15 min)**. Modes are layered
+on top of the existing systems (weapons, grenades, economy, round machine,
+downed/respawn, bots) so most are cheap to build.
+
+Match length guidance: a single timed round or a first-to-N target keeps matches
+short — set `ROUNDS_TO_WIN = 1` with a kill/score limit rather than a long
+best-of-15 for the casual modes.
+
+### Roadmap (by fun-per-effort)
+
+| Mode | Hook | Status | Reuses |
+|------|------|--------|--------|
+| **Gun Game** | Each kill upgrades you through a weapon ladder; first to finish wins. FFA, no economy, instant respawn. | **In progress** | Weapon system, WeaponDatabase ladder, downed/respawn, bots |
+| **Grenade Warfare** | Grenades only, auto-replenished. Push people off ledges. | Planned | Full grenade kit |
+| **FFA Deathmatch** | Everyone vs everyone, first to N kills or timer. | Planned | Combat, respawn, round timer/score |
+| **Juggernaut** | One buffed player; killer inherits the role. | Planned | Health scaling, downed state |
+| **Hot Potato Extraction** | Carry an objective to extract while the enemy defends. Signature objective mode. | Scaffolded (`examples/hot_potato_extraction.gd`) | Round machine, team scoring |
+| **Infection / Last Man Standing** | Few fast melee "infected" convert survivors. | Planned | Needs melee + role conversion |
+
+### Mutators (force multiplier)
+
+Cheap toggles that turn any mode into a different night — mostly flipping
+existing constants:
+
+- Low gravity / super-slide / double-jump (movement constants)
+- One in the Chamber (1 bullet, refunded on kill)
+- Big-head / tiny / giant players
+- Bouncy or instant-cook grenades
+- Headshots-only / snipers-only
+
+A mutator dropdown over 2–3 base modes yields a dozen "modes" for little code.
+
+### Gun Game (first mode)
+
+- FFA: player + bots, no teams, no buy economy.
+- Each participant has a **level** = index into a weapon ladder (pistol → SMGs →
+  rifles → shotguns → snipers → finisher pistol).
+- A kill **advances the killer one level** (swaps to the next weapon). Reaching
+  past the final weapon **wins**.
+- Instant/quick respawn; level persists through death.
+- Testable offline with bots before any networking (no broker needed).
+
+---
+
 ## Future Considerations
 
 - Competitive ranking system

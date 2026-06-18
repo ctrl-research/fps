@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://gun_game_scene"]
+
+[ext_resource type="Script" path="res://addons/godot-multiplayer-weapon-system/scenes/gun_game.gd" id="1"]
+
+[node name="GunGame" type="Node3D"]
+script = ExtResource("1")
