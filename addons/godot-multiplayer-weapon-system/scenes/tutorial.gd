@@ -37,6 +37,7 @@ const SPAWN: Vector3 = Vector3(0.0, 1.5, 8.0)
 var _player: PlayerController = null
 var _pause_menu: PauseMenu = null
 var _buy_menu = null
+var _was_captured: bool = false
 
 func _ready() -> void:
 	_build_environment()
@@ -50,15 +51,32 @@ func _ready() -> void:
 	_setup_loadout_station()
 	_build_hud_overlay()
 
+func _process(_delta: float) -> void:
+	# Browsers reserve Esc to exit pointer lock and don't deliver the keypress, so
+	# the Esc action never reaches us on web. Detect the lock loss instead: if the
+	# cursor was captured and is suddenly free with no menu open, the player hit
+	# Esc — open the pause menu. (Godot only reports CAPTURED->VISIBLE on a real
+	# unlock, so requesting capture while still unlocked won't false-trigger.)
+	var captured := Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED
+	if _was_captured and not captured and not _any_menu_open():
+		_toggle_pause()
+	_was_captured = captured
+
 func _unhandled_input(event: InputEvent) -> void:
 	if not event.is_action_pressed("disconnect_network"):
 		return
 	# Esc priority: close the buy menu first if it's open, otherwise toggle the
-	# in-game (pause) menu.
+	# in-game (pause) menu. (On desktop Esc arrives here; on web the _process
+	# lock-loss check above handles opening the pause menu.)
 	if is_instance_valid(_buy_menu) and _buy_menu.is_open():
 		_buy_menu.close_menu()
 	else:
 		_toggle_pause()
+
+func _any_menu_open() -> bool:
+	if is_instance_valid(_pause_menu):
+		return true
+	return is_instance_valid(_buy_menu) and _buy_menu.is_open()
 
 ## Esc opens the in-game menu (Resume / Settings / Leave); pressing it again
 ## while open resumes.
