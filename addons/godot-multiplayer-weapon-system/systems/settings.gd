@@ -23,7 +23,7 @@ const CROSSHAIR_STYLES: Array[String] = ["Cross", "Dot", "Circle", "X", "Star"]
 const BINDABLE_ACTIONS: Array[String] = [
 	"move_forward", "move_backward", "move_left", "move_right",
 	"jump", "sprint", "crouch", "shoot", "reload",
-	"weapon_primary", "weapon_secondary", "buy",
+	"weapon_primary", "weapon_secondary", "grenade", "buy",
 ]
 
 ## Friendly labels for the actions above.
@@ -39,6 +39,7 @@ const ACTION_LABELS: Dictionary = {
 	"reload": "Reload",
 	"weapon_primary": "Primary Weapon",
 	"weapon_secondary": "Secondary Weapon",
+	"grenade": "Throw Grenade",
 	"buy": "Buy Menu",
 }
 

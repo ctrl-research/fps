@@ -27,6 +27,7 @@ signal reload_started(duration: float)
 signal reload_finished()
 
 const PROJECTILE_SCENE: String = "res://addons/godot-multiplayer-weapon-system/player/projectile.tscn"
+const GRENADE_SCENE: String = "res://addons/godot-multiplayer-weapon-system/player/grenade.tscn"
 const HUD_SCRIPT: String = "res://addons/godot-multiplayer-weapon-system/ui/weapon_hud.gd"
 
 ## Maximum hitscan range in metres.
@@ -122,6 +123,9 @@ func _handle_input() -> void:
 	if Input.is_action_just_pressed("reload"):
 		_start_reload()
 
+	if Input.is_action_just_pressed("grenade"):
+		_throw_grenade()
+
 	var weapon := _active()
 	if weapon == null:
 		return
@@ -130,6 +134,33 @@ func _handle_input() -> void:
 			_try_fire()
 	elif Input.is_action_just_pressed("shoot"):
 		_try_fire()
+
+# === Grenades ===
+
+## Throw the first grenade type the player is carrying, if any.
+func _throw_grenade() -> void:
+	if _camera == null:
+		return
+	var grenade_id := _first_available_grenade()
+	if grenade_id == "":
+		return
+	var data := WeaponDatabase.get_grenade(grenade_id)
+	PlayerLoadout.use_grenade(grenade_id)
+
+	var scene: PackedScene = load(GRENADE_SCENE)
+	var grenade: Grenade = scene.instantiate()
+	var forward := -_camera.global_transform.basis.z
+	# Set the spawn position before add_child (it's a physics body).
+	grenade.position = _camera.global_position + forward * 0.6
+	var world := _player.get_parent() if _player else get_tree().current_scene
+	world.add_child(grenade)
+	grenade.throw_from(data, _peer_id(), forward)
+
+func _first_available_grenade() -> String:
+	for grenade_id in PlayerLoadout.grenades:
+		if PlayerLoadout.grenades[grenade_id] > 0:
+			return grenade_id
+	return ""
 
 # === Loadout / switching ===
 
@@ -219,6 +250,7 @@ func _fire_hitscan(weapon: Weapon) -> void:
 		var dir := _aim_direction(spread)
 		var query := PhysicsRayQueryParameters3D.create(origin, origin + dir * MAX_DISTANCE)
 		query.collide_with_bodies = true
+		query.collision_mask = 1  # layer 1 = world + characters; ignores thrown grenades
 		if _player:
 			query.exclude = [_player.get_rid()]
 		var hit := space.intersect_ray(query)
