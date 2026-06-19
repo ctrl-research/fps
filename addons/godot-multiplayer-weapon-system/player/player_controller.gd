@@ -41,6 +41,11 @@ const MOUSE_VERTICAL_LIMIT: float = 89.0
 # camera (so it never blocks the view) but rendered by mirrors and other players.
 const OWN_BODY_VISUAL_LAYER: int = 1 << 19
 
+# Visual layer 17: the local first-person weapon viewmodel. Rendered by the
+# owner's camera but culled by mirrors (so the gun isn't seen at head height in
+# reflections — the in-hand weapon shows there instead).
+const VIEWMODEL_VISUAL_LAYER: int = 1 << 16
+
 ## Player character model (KayKit Mage). Character selection will swap this later.
 const PLAYER_MODEL: String = "res://assets/characters/kaykit_adventurers/Mage.glb"
 
@@ -159,7 +164,17 @@ func _build_body_mesh(is_local: bool) -> void:
 	# Comic outline + posterise is a global post-process; the body's base colour
 	# encodes team (blue ally / red enemy) for readability.
 	_apply_team_tint()
+
+	# Put the held weapon in the model's hand (for mirrors / other players); the
+	# local first-person viewmodel is separate and camera-mounted.
+	if _weapon_controller:
+		_weapon_controller.attach_world_weapon()
+
 	_prev_anim_pos = global_position
+
+## The player's character model (for the weapon controller's hand attachment).
+func character_model() -> CharacterModel:
+	return _model
 
 ## Colour the body relative to the local viewer's team: allies blue, enemies
 ## red. Recomputed on team swap.
