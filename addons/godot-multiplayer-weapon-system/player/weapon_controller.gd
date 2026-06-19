@@ -366,7 +366,7 @@ func _build_effects() -> void:
 	_muzzle = Node3D.new()
 	_muzzle.name = "Muzzle"
 	# Sit the muzzle in front of and below the camera, roughly at gun height.
-	_muzzle.position = Vector3(0.25, -0.2, -0.7)
+	_muzzle.position = Vector3(0.25, -0.33, -0.7)
 	if _camera:
 		_camera.add_child(_muzzle)
 	else:
@@ -407,7 +407,8 @@ func _build_effects() -> void:
 func _build_viewmodel() -> void:
 	_viewmodel = Node3D.new()
 	_viewmodel.name = "ViewModel"
-	_viewmodel.position = Vector3(0.25, -0.22, -0.45)
+	# Lowered to sit around the character model's hand level.
+	_viewmodel.position = Vector3(0.25, -0.35, -0.45)
 	if _camera:
 		_camera.add_child(_viewmodel)
 	else:

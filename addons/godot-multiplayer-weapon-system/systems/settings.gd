@@ -45,7 +45,7 @@ const ACTION_LABELS: Dictionary = {
 
 var mouse_sensitivity: float = DEFAULT_MOUSE_SENSITIVITY
 ## When true, the minimap rotates with the player's view (border stays fixed).
-var minimap_rotates: bool = false
+var minimap_rotates: bool = true
 ## Master output volume, 0..1 (applied to the Master audio bus).
 var master_volume: float = DEFAULT_MASTER_VOLUME
 ## Index into CROSSHAIR_STYLES.
@@ -172,7 +172,7 @@ func _load() -> void:
 	if cfg.load(CONFIG_PATH) != OK:
 		return
 	mouse_sensitivity = cfg.get_value("input", "mouse_sensitivity", DEFAULT_MOUSE_SENSITIVITY)
-	minimap_rotates = cfg.get_value("options", "minimap_rotates", false)
+	minimap_rotates = cfg.get_value("options", "minimap_rotates", true)
 	master_volume = cfg.get_value("audio", "master_volume", DEFAULT_MASTER_VOLUME)
 	crosshair_style = cfg.get_value("options", "crosshair_style", 0)
 	entity_outline_enabled = cfg.get_value("options", "entity_outline_enabled", true)
