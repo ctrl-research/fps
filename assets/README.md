@@ -11,10 +11,14 @@ One subfolder **per pack** so each keeps its own relative texture paths:
 ```
 assets/
   characters/<pack-name>/      players, bots
+  animations/<rig-name>/       shared animation clips, by rig
   props/<pack-name>/           weapons, grenades, pickups, small objects
   environments/<pack-name>/    map geometry, large set pieces
   CREDITS.md                   license + attribution for every pack (required)
 ```
+
+Characters that share a skeleton share one animation set (e.g. KayKit's Mage and
+Skeleton Warrior both use **Rig_Medium**, driven by `animations/rig_medium/`).
 
 ## Format
 
