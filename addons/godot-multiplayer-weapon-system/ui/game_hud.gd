@@ -22,6 +22,7 @@ const GRENADE_COLORS: Dictionary = {
 }
 const TEAM_COLORS: Array[Color] = [Color(0.4, 0.6, 1.0), Color(1.0, 0.45, 0.4)]
 const LOCAL_COLOR: Color = Color(0.3, 1.0, 0.45)
+const TEAM_LABELS: Array[String] = ["Team A", "Team B"]
 
 var _player: PlayerController = null
 
@@ -34,10 +35,16 @@ var _buy_hint: Label = null
 var _minimap: Control = null
 var _status_label: Label = null
 
+# Hold-Tab scoreboard overlay.
+var _scoreboard_root: Control = null
+var _scoreboard_vbox: VBoxContainer = null
+var _scoreboard_shown: bool = false
+
 ## Connect the HUD to its player and build the UI.
 func bind(player: PlayerController) -> void:
 	_player = player
 	_build_ui()
+	_build_scoreboard()
 
 	player.health_changed.connect(_on_health_changed)
 	player.downed.connect(_on_downed)
@@ -58,6 +65,18 @@ func _process(_delta: float) -> void:
 		_minimap.queue_redraw()
 	if _player and _player.is_downed:
 		_status_label.text = "DOWNED — %ds" % int(ceil(maxf(_player.bleedout_timer, 0.0)))
+	_update_scoreboard()
+
+## Show the scoreboard while Tab is held (rebuilt on press for live values).
+func _update_scoreboard() -> void:
+	var held := Input.is_key_pressed(KEY_TAB)
+	if held == _scoreboard_shown:
+		return
+	_scoreboard_shown = held
+	if held:
+		_refresh_scoreboard()
+	if _scoreboard_root:
+		_scoreboard_root.visible = held
 
 # === Build ===
 
@@ -212,6 +231,77 @@ func _refresh_scores() -> void:
 	var team_a: int = GameState.team_scores.get(0, 0)
 	var team_b: int = GameState.team_scores.get(1, 0)
 	_scores_label.text = "TEAM A   %d : %d   TEAM B" % [team_a, team_b]
+
+# === Scoreboard (hold Tab) ===
+
+## Build the (hidden) scoreboard overlay container. Populated on show.
+func _build_scoreboard() -> void:
+	_scoreboard_root = CenterContainer.new()
+	_scoreboard_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_scoreboard_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_scoreboard_root.visible = false
+	add_child(_scoreboard_root)
+
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(460, 0)
+	_scoreboard_root.add_child(panel)
+
+	var margin := MarginContainer.new()
+	for side in ["left", "top", "right", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, 20)
+	panel.add_child(margin)
+
+	_scoreboard_vbox = VBoxContainer.new()
+	_scoreboard_vbox.add_theme_constant_override("separation", 8)
+	margin.add_child(_scoreboard_vbox)
+
+## Repopulate the scoreboard from live GameState: team score + per-player rows
+## (player, team, kills, credits), sorted by kills.
+func _refresh_scoreboard() -> void:
+	if _scoreboard_vbox == null:
+		return
+	for child in _scoreboard_vbox.get_children():
+		child.queue_free()
+
+	var title := Label.new()
+	title.text = "SCOREBOARD"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 24)
+	_scoreboard_vbox.add_child(title)
+
+	var score := Label.new()
+	score.text = "%s   %d  —  %d   %s" % [TEAM_LABELS[0],
+		GameState.team_scores.get(0, 0), GameState.team_scores.get(1, 0), TEAM_LABELS[1]]
+	score.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_scoreboard_vbox.add_child(score)
+
+	_scoreboard_vbox.add_child(HSeparator.new())
+
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.add_theme_constant_override("h_separation", 28)
+	grid.add_theme_constant_override("v_separation", 6)
+	_scoreboard_vbox.add_child(grid)
+
+	for header in ["Player", "Team", "Kills", "Credits"]:
+		var cell := Label.new()
+		cell.text = header
+		cell.add_theme_color_override("font_color", Color(0.7, 0.75, 0.85))
+		grid.add_child(cell)
+
+	var peers: Array = GameState.player_credits.keys()
+	peers.sort_custom(func(a, b): return GameState.player_kills.get(a, 0) > GameState.player_kills.get(b, 0))
+	for peer_id in peers:
+		var team: int = GameState._get_player_team(peer_id)
+		_add_cell(grid, "Player %d" % peer_id)
+		_add_cell(grid, TEAM_LABELS[team % 2])
+		_add_cell(grid, str(GameState.player_kills.get(peer_id, 0)))
+		_add_cell(grid, "$%d" % GameState.get_player_credits(peer_id))
+
+func _add_cell(grid: GridContainer, text: String) -> void:
+	var label := Label.new()
+	label.text = text
+	grid.add_child(label)
 
 func _update_buy_hint(state: int) -> void:
 	if state == GameState.RoundState.BUY_PHASE:
