@@ -252,6 +252,13 @@ func _try_fire() -> void:
 	_cooldown = weapon.fire_rate()
 	_time_since_fire = 0.0
 
+	# Melee is a swing, not a shot: short-range hit, no muzzle flash / gunshot /
+	# recoil — just the viewmodel lunge.
+	if weapon.is_melee():
+		_fire_hitscan(weapon)
+		_swing_viewmodel()
+		return
+
 	if weapon.fire_mode() == "projectile":
 		_fire_projectile(weapon)
 	else:
@@ -264,9 +271,17 @@ func _try_fire() -> void:
 	_broadcast_fire_effects()
 	ammo_changed.emit(weapon.mag, weapon.reserve)
 
-	# Auto-reload as soon as the magazine runs dry (melee has no ammo).
-	if not weapon.is_melee() and weapon.mag == 0:
+	# Auto-reload as soon as the magazine runs dry.
+	if weapon.mag == 0:
 		_start_reload()
+
+## A quick forward stab of the viewmodel — the knife swing feedback.
+func _swing_viewmodel() -> void:
+	if _viewmodel == null:
+		return
+	var tween := create_tween()
+	tween.tween_property(_viewmodel, "rotation:x", deg_to_rad(-50.0), 0.05)
+	tween.tween_property(_viewmodel, "rotation:x", 0.0, 0.12)
 
 func _fire_hitscan(weapon: Weapon) -> void:
 	if _camera == null:
