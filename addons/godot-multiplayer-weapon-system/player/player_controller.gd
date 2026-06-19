@@ -118,6 +118,9 @@ func _ready() -> void:
 	# Joined so the minimap and other systems can enumerate all player bodies.
 	add_to_group("players")
 
+	# Re-tint allies/enemies when sides swap mid-match.
+	GameState.teams_swapped.connect(_apply_team_tint)
+
 	if is_local:
 		var hud = load("res://addons/godot-multiplayer-weapon-system/ui/game_hud.gd").new()
 		add_child(hud)
@@ -153,8 +156,19 @@ func _build_body_mesh(is_local: bool) -> void:
 		_model.set_visual_layer(OWN_BODY_VISUAL_LAYER)
 		_camera.cull_mask &= ~OWN_BODY_VISUAL_LAYER
 
-	# Stylisation (outline + colour) is a global screen-space post-process now.
+	# Comic outline + posterise is a global post-process; the body's base colour
+	# encodes team (blue ally / red enemy) for readability.
+	_apply_team_tint()
 	_prev_anim_pos = global_position
+
+## Colour the body relative to the local viewer's team: allies blue, enemies
+## red. Recomputed on team swap.
+func _apply_team_tint() -> void:
+	if _model == null:
+		return
+	var local_team := GameState._get_player_team(GameState._local_peer_id())
+	var my_team := GameState._get_player_team(authority_peer_id)
+	_model.set_tint(CategoryColors.ALLY if my_team == local_team else CategoryColors.ENEMY)
 
 func _input(event: InputEvent) -> void:
 	# Only look around while the cursor is captured. Overlays such as the buy menu

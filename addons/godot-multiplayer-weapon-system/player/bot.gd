@@ -66,6 +66,7 @@ func _ready() -> void:
 	_model = CharacterModel.new()
 	add_child(_model)
 	_model.setup(BOT_MODEL)
+	_model.set_tint(CategoryColors.ENEMY)
 
 	_build_tracer()
 	_reset()
