@@ -29,7 +29,7 @@ func _ready() -> void:
 	_material = StandardMaterial3D.new()
 	_mesh.material_override = _material
 	_reset()
-	# Stylise the dummy body (outline + dither), like other entities.
+	# Stylise the dummy body (outline), like other entities.
 	EntityVisuals.apply(self)
 
 func _physics_process(delta: float) -> void:

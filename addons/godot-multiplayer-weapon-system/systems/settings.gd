@@ -50,9 +50,10 @@ var minimap_rotates: bool = false
 var master_volume: float = DEFAULT_MASTER_VOLUME
 ## Index into CROSSHAIR_STYLES.
 var crosshair_style: int = 0
-## Stylised entity shader toggles (view-angle outline + dithering grain).
+## Per-entity view-angle outline shader.
 var entity_outline_enabled: bool = true
-var entity_dither_enabled: bool = true
+## Global 1-bit dithering post-process.
+var dither_enabled: bool = true
 
 # Default events captured from the project InputMap at boot, used by reset.
 var _default_events: Dictionary = {}
@@ -111,8 +112,8 @@ func set_entity_outline_enabled(value: bool) -> void:
 	save()
 	settings_changed.emit()
 
-func set_entity_dither_enabled(value: bool) -> void:
-	entity_dither_enabled = value
+func set_dither_enabled(value: bool) -> void:
+	dither_enabled = value
 	save()
 	settings_changed.emit()
 
@@ -151,7 +152,7 @@ func save() -> void:
 	cfg.set_value("audio", "master_volume", master_volume)
 	cfg.set_value("options", "crosshair_style", crosshair_style)
 	cfg.set_value("options", "entity_outline_enabled", entity_outline_enabled)
-	cfg.set_value("options", "entity_dither_enabled", entity_dither_enabled)
+	cfg.set_value("options", "dither_enabled", dither_enabled)
 	for action in BINDABLE_ACTIONS:
 		if not InputMap.has_action(action):
 			continue
@@ -175,7 +176,7 @@ func _load() -> void:
 	master_volume = cfg.get_value("audio", "master_volume", DEFAULT_MASTER_VOLUME)
 	crosshair_style = cfg.get_value("options", "crosshair_style", 0)
 	entity_outline_enabled = cfg.get_value("options", "entity_outline_enabled", true)
-	entity_dither_enabled = cfg.get_value("options", "entity_dither_enabled", true)
+	dither_enabled = cfg.get_value("options", "dither_enabled", true)
 	if not cfg.has_section("keys"):
 		return
 	for action in cfg.get_section_keys("keys"):
