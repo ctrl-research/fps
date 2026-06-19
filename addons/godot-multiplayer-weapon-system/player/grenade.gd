@@ -30,9 +30,11 @@ var _fuse: float = FUSE_TIME
 var _detonated: bool = false
 
 ## Configure from a WeaponDatabase grenade entry and throw along `direction`.
-## `fuse_remaining` lets the thrower pass a cooked-down fuse. Call after add_child
-## (its position should be set before add_child, since it's a physics body).
-func throw_from(data: Dictionary, shooter_id: int, direction: Vector3, fuse_remaining: float = FUSE_TIME) -> void:
+## `fuse_remaining` lets the thrower pass a cooked-down fuse. `speed`/`lift` set
+## the throw arc (mid-range throw vs short lob). Call after add_child (its
+## position should be set before add_child, since it's a physics body).
+func throw_from(data: Dictionary, shooter_id: int, direction: Vector3, fuse_remaining: float = FUSE_TIME,
+		speed: float = THROW_SPEED, lift: float = THROW_LIFT) -> void:
 	type = data.get("type", "frag")
 	blast_damage = float(data.get("damage", 0.0))
 	blast_radius = float(data.get("radius", 5.0))
@@ -40,7 +42,7 @@ func throw_from(data: Dictionary, shooter_id: int, direction: Vector3, fuse_rema
 	force = float(data.get("force", 0.0))
 	attacker_id = shooter_id
 	_fuse = maxf(fuse_remaining, 0.05)
-	linear_velocity = direction.normalized() * THROW_SPEED + Vector3.UP * THROW_LIFT
+	linear_velocity = direction.normalized() * speed + Vector3.UP * lift
 
 func _physics_process(delta: float) -> void:
 	if _detonated:
