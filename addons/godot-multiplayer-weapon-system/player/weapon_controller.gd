@@ -71,6 +71,8 @@ var _flash_light: OmniLight3D = null
 var _audio: AudioStreamPlayer3D = null
 var _flash_timer: float = 0.0
 var _viewmodel: Node3D = null
+# Third-person weapon parented to the model's hand bone (mirror / other players).
+var _hand_weapon: Node3D = null
 
 ## Wire the controller to its body and camera. Builds effect nodes, the local
 ## HUD, and the initial loadout. Called by PlayerController after add_child.
@@ -390,7 +392,10 @@ func _build_effects() -> void:
 	else:
 		add_child(_muzzle)
 
-	_build_viewmodel()
+	# The first-person viewmodel only exists for the local player (so remote
+	# bodies don't carry a gun at head height); they get the hand weapon instead.
+	if _is_local:
+		_build_viewmodel()
 
 	var flash_material := StandardMaterial3D.new()
 	flash_material.emission_enabled = true
@@ -421,58 +426,87 @@ func _build_effects() -> void:
 
 # === Weapon view model ===
 
-## Container for the held-weapon mesh, sitting in front of the camera.
+## First-person viewmodel, in front of the camera, on the viewmodel layer (the
+## mirror camera culls that layer so it never shows in reflections).
 func _build_viewmodel() -> void:
 	_viewmodel = Node3D.new()
 	_viewmodel.name = "ViewModel"
-	# Lowered to sit around the character model's hand level.
-	_viewmodel.position = Vector3(0.25, -0.35, -0.45)
+	_viewmodel.position = Vector3(0.25, -0.25, -0.45)
 	if _camera:
 		_camera.add_child(_viewmodel)
 	else:
 		add_child(_viewmodel)
 
-## Rebuild a simple blocky gun model sized to the active weapon's class.
-func _update_viewmodel(weapon: Weapon) -> void:
-	if _viewmodel == null:
+## Parent a third-person weapon to the model's hand bone so the mirror and other
+## players see the gun in-hand. Called by the player once its model exists.
+func attach_world_weapon() -> void:
+	if _player == null:
 		return
-	for child in _viewmodel.get_children():
+	var model: CharacterModel = _player.character_model()
+	if model == null:
+		return
+	var socket := model.get_hand_socket()
+	if socket == null:
+		return
+	_hand_weapon = Node3D.new()
+	_hand_weapon.name = "HandWeapon"
+	socket.add_child(_hand_weapon)
+	var weapon := _active()
+	if weapon:
+		_update_viewmodel(weapon)
+
+## Rebuild both the FP viewmodel (if any) and the hand weapon (if any).
+func _update_viewmodel(weapon: Weapon) -> void:
+	if _viewmodel != null:
+		_rebuild_weapon(_viewmodel, weapon, PlayerController.VIEWMODEL_VISUAL_LAYER)
+	if _hand_weapon != null:
+		_rebuild_weapon(_hand_weapon, weapon, _body_layer())
+
+## The layer the body renders on, so the hand weapon shows wherever the body does
+## (local player: own-body layer → mirror only; everyone else: default).
+func _body_layer() -> int:
+	if _player and _player.is_multiplayer_authority():
+		return PlayerController.OWN_BODY_VISUAL_LAYER
+	return 1
+
+## Build a simple blocky weapon (sized to the class) under `parent` on `layer`.
+func _rebuild_weapon(parent: Node3D, weapon: Weapon, layer: int) -> void:
+	for child in parent.get_children():
 		child.queue_free()
 
 	if weapon.is_melee():
 		# Knife: a short blade and a dark handle.
-		_add_gun_part(Vector3(0.02, 0.05, 0.26), Vector3(0.0, 0.0, -0.13), Color(0.75, 0.78, 0.82))
-		_add_gun_part(Vector3(0.04, 0.05, 0.1), Vector3(0.0, -0.01, 0.05), Color(0.12, 0.12, 0.14))
+		_add_gun_part(parent, Vector3(0.02, 0.05, 0.26), Vector3(0.0, 0.0, -0.13), Color(0.75, 0.78, 0.82), layer)
+		_add_gun_part(parent, Vector3(0.04, 0.05, 0.1), Vector3(0.0, -0.01, 0.05), Color(0.12, 0.12, 0.14), layer)
 		return
 
 	var color := _viewmodel_color(weapon.type())
 	var barrel_len := _barrel_length(weapon.type())
 
 	# Receiver (main body), barrel, and grip — a recognisable gun silhouette.
-	_add_gun_part(Vector3(0.07, 0.1, 0.32), Vector3(0.0, 0.0, 0.0), color)
-	_add_gun_part(Vector3(0.035, 0.035, barrel_len), Vector3(0.0, 0.015, -0.16 - barrel_len * 0.5), color)
-	_add_gun_part(Vector3(0.06, 0.14, 0.06), Vector3(0.0, -0.11, 0.1), color)
+	_add_gun_part(parent, Vector3(0.07, 0.1, 0.32), Vector3(0.0, 0.0, 0.0), color, layer)
+	_add_gun_part(parent, Vector3(0.035, 0.035, barrel_len), Vector3(0.0, 0.015, -0.16 - barrel_len * 0.5), color, layer)
+	_add_gun_part(parent, Vector3(0.06, 0.14, 0.06), Vector3(0.0, -0.11, 0.1), color, layer)
 
 	match weapon.type():
 		"sniper":
-			# Scope on top.
-			_add_gun_part(Vector3(0.04, 0.04, 0.18), Vector3(0.0, 0.09, 0.0), Color(0.05, 0.05, 0.06))
+			_add_gun_part(parent, Vector3(0.04, 0.04, 0.18), Vector3(0.0, 0.09, 0.0), Color(0.05, 0.05, 0.06), layer)
 		"smg", "assault_rifle", "shotgun":
-			# Magazine below the receiver.
-			_add_gun_part(Vector3(0.05, 0.16, 0.07), Vector3(0.0, -0.13, -0.05), color)
+			_add_gun_part(parent, Vector3(0.05, 0.16, 0.07), Vector3(0.0, -0.13, -0.05), color, layer)
 
-func _add_gun_part(part_size: Vector3, offset: Vector3, color: Color) -> void:
+func _add_gun_part(parent: Node3D, part_size: Vector3, offset: Vector3, color: Color, layer: int) -> void:
 	var part := MeshInstance3D.new()
 	var box := BoxMesh.new()
 	box.size = part_size
 	part.mesh = box
 	part.position = offset
+	part.layers = layer
 	var material := StandardMaterial3D.new()
 	material.albedo_color = color
 	material.metallic = 0.6
 	material.roughness = 0.4
 	part.material_override = material
-	_viewmodel.add_child(part)
+	parent.add_child(part)
 
 func _viewmodel_color(weapon_type: String) -> Color:
 	match weapon_type:

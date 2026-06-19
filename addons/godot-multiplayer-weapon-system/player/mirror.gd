@@ -53,8 +53,10 @@ func _ready() -> void:
 	_resize_viewport()
 
 	_mirror_cam = Camera3D.new()
-	# Skip the mirror surface (feedback) and any no-reflection-tagged nodes.
-	_mirror_cam.cull_mask = 0xFFFFF & ~SURFACE_VISUAL_LAYER & ~NO_REFLECTION_VISUAL_LAYER
+	# Skip the mirror surface (feedback), no-reflection-tagged nodes, and the
+	# first-person weapon viewmodel (the in-hand weapon shows in reflections).
+	_mirror_cam.cull_mask = 0xFFFFF & ~SURFACE_VISUAL_LAYER & ~NO_REFLECTION_VISUAL_LAYER \
+		& ~PlayerController.VIEWMODEL_VISUAL_LAYER
 	_mirror_cam.current = true
 	_viewport.add_child(_mirror_cam)
 

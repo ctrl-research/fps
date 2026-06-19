@@ -54,6 +54,7 @@ static var _shared_lib: AnimationLibrary = null
 
 var _anim: AnimationPlayer = null
 var _skeleton: Skeleton3D = null
+var _hand_socket: Node3D = null
 var _current: String = ""
 var _dead: bool = false
 
@@ -122,6 +123,31 @@ func set_tint(color: Color) -> void:
 
 func meshes() -> Array:
 	return _meshes()
+
+# Tunables: where a held weapon sits relative to the right-hand bone. KayKit hand
+# bones vary in rest orientation, so expect to nudge these once in-engine.
+const HAND_OFFSET: Vector3 = Vector3(0.0, 0.02, -0.08)
+const HAND_ROTATION_DEG: Vector3 = Vector3(0.0, 90.0, 0.0)
+
+## A node parented to the model's right-hand bone, for holding a weapon (created
+## on first use). The weapon mesh is added under the returned socket.
+func get_hand_socket() -> Node3D:
+	if _hand_socket != null:
+		return _hand_socket
+	if _skeleton == null:
+		return null
+	var attach := BoneAttachment3D.new()
+	var bone := "handslot.r"
+	if _skeleton.find_bone(bone) == -1:
+		bone = "hand.r"
+	attach.bone_name = bone
+	_skeleton.add_child(attach)
+	_hand_socket = Node3D.new()
+	_hand_socket.position = HAND_OFFSET
+	_hand_socket.rotation = Vector3(
+		deg_to_rad(HAND_ROTATION_DEG.x), deg_to_rad(HAND_ROTATION_DEG.y), deg_to_rad(HAND_ROTATION_DEG.z))
+	attach.add_child(_hand_socket)
+	return _hand_socket
 
 # === internals ===
 
