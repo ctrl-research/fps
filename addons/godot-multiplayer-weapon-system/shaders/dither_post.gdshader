@@ -11,9 +11,9 @@ shader_type canvas_item;
 
 uniform sampler2D screen_tex : hint_screen_texture, filter_nearest;
 // Quantisation steps per colour channel. Lower = stronger dither texture.
-uniform float color_levels : hint_range(2.0, 16.0) = 4.0;
+uniform float color_levels : hint_range(2.0, 16.0) = 3.0;
 // Larger = chunkier dither cells (pattern scaled down in screen space).
-uniform float dither_scale : hint_range(1.0, 8.0) = 1.0;
+uniform float dither_scale : hint_range(1.0, 8.0) = 3.0;
 
 // Centred 4x4 Bayer threshold (0..1) for a screen-space fragment.
 float bayer(vec2 frag) {

@@ -29,7 +29,7 @@ void fragment() {
 }
 """
 
-@export var surface_size: Vector2 = Vector2(2.0, 2.4)
+@export var surface_size: Vector2 = Vector2(6.0, 2.4)
 
 var _viewport: SubViewport = null
 var _mirror_cam: Camera3D = null
@@ -37,6 +37,7 @@ var _surface: MeshInstance3D = null
 
 func _ready() -> void:
 	_build_frame()
+	_build_collision()
 
 	_surface = MeshInstance3D.new()
 	var quad := QuadMesh.new()
@@ -109,6 +110,18 @@ func _build_frame() -> void:
 	_add_frame_bar(Vector3(0.0, -half.y - t * 0.5, 0.0), horizontal, material)
 	_add_frame_bar(Vector3(-half.x - t * 0.5, 0.0, 0.0), vertical, material)
 	_add_frame_bar(Vector3(half.x + t * 0.5, 0.0, 0.0), vertical, material)
+
+## A solid wall behind the surface so players can't walk through the mirror.
+func _build_collision() -> void:
+	var body := StaticBody3D.new()
+	body.collision_layer = 1
+	body.collision_mask = 0
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(surface_size.x, surface_size.y, 0.2)
+	shape.shape = box
+	body.add_child(shape)
+	add_child(body)
 
 func _add_frame_bar(offset: Vector3, bar_size: Vector3, material: StandardMaterial3D) -> void:
 	var bar := MeshInstance3D.new()
