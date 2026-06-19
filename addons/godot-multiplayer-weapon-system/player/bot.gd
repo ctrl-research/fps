@@ -44,6 +44,11 @@ var _material: StandardMaterial3D = null
 var _spawn_position: Vector3 = Vector3.ZERO
 var _last_attacker_id: int = 0
 var _tracer: MeshInstance3D = null
+var _model: CharacterModel = null
+var _prev_anim_pos: Vector3 = Vector3.ZERO
+
+## Bot character model (KayKit Skeleton Warrior).
+const BOT_MODEL: String = "res://assets/characters/kaykit_skeletons/Skeleton_Warrior.glb"
 
 func _ready() -> void:
 	_spawn_position = global_position
@@ -53,13 +58,20 @@ func _ready() -> void:
 	_material = StandardMaterial3D.new()
 	_mesh.material_override = _material
 	_head.material_override = _material
+	# The KayKit model replaces the placeholder capsule/sphere visuals.
+	_mesh.visible = false
+	_head.visible = false
 	_muzzle_flash.visible = false
 	_muzzle_flash.add_to_group(EntityVisuals.EXCLUDE_GROUP)
+
+	_model = CharacterModel.new()
+	add_child(_model)
+	_model.setup(BOT_MODEL)
+
 	_build_tracer()
 	_reset()
 
-	# Stylise the bot body (outline). The shared base material's runtime tints
-	# (hit flash, downed colour) still show through the additive overlay.
+	# Stylise the bot body (outline); dithering is a global post-process.
 	EntityVisuals.apply(self)
 
 func _physics_process(delta: float) -> void:
@@ -76,6 +88,11 @@ func _physics_process(delta: float) -> void:
 	velocity.x = 0.0
 	velocity.z = 0.0
 	move_and_slide()
+
+	if _model != null:
+		var moved := global_position - _prev_anim_pos
+		_prev_anim_pos = global_position
+		_model.set_locomotion(Vector2(moved.x, moved.z).length() / maxf(delta, 0.0001), is_on_floor())
 
 	var target := _find_target()
 	if target != null:
@@ -111,9 +128,9 @@ func request_damage(amount: float, attacker_id: int) -> void:
 func _die() -> void:
 	_dead = true
 	_respawn_timer = RESPAWN_DELAY
-	_mesh.visible = false
-	_head.visible = false
 	_muzzle_flash.visible = false
+	if _model != null:
+		_model.play_death()
 	_label.text = "respawning…"
 	_collision.set_deferred("disabled", true)
 	defeated.emit(_last_attacker_id)
@@ -121,10 +138,11 @@ func _die() -> void:
 func _reset() -> void:
 	_dead = false
 	health = max_health
-	_mesh.visible = true
-	_head.visible = true
+	if _model != null:
+		_model.play_idle()
 	_collision.set_deferred("disabled", false)
 	global_position = _spawn_position
+	_prev_anim_pos = _spawn_position
 	velocity = Vector3.ZERO
 	# Stagger so a group of bots doesn't fire in unison.
 	_fire_timer = FIRE_INTERVAL * randf_range(0.4, 1.2)

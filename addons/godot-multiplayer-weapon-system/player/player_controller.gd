@@ -41,6 +41,9 @@ const MOUSE_VERTICAL_LIMIT: float = 89.0
 # camera (so it never blocks the view) but rendered by mirrors and other players.
 const OWN_BODY_VISUAL_LAYER: int = 1 << 19
 
+## Player character model (KayKit Mage). Character selection will swap this later.
+const PLAYER_MODEL: String = "res://assets/characters/kaykit_adventurers/Mage.glb"
+
 # === Crouch/Stand ===
 const CROUCH_TRANSITION_SPEED: float = 8.0
 const STAND_HEIGHT: float = 1.8
@@ -87,6 +90,9 @@ var emp_timer: float = 0.0
 var _knockback: Vector3 = Vector3.ZERO
 var _last_attacker_id: int = 0
 var _weapon_controller: WeaponController = null
+var _model: CharacterModel = null
+# Previous position, for deriving planar speed to pick the locomotion animation.
+var _prev_anim_pos: Vector3 = Vector3.ZERO
 
 func _ready() -> void:
 	health = max_health
@@ -130,44 +136,26 @@ func _ready() -> void:
 	# Sync initial position
 	sync_position = global_position
 
-## Build a simple visible body (torso + head) so the player is seen by mirrors
-## and other players. For the local player it is moved to a dedicated visual
-## layer that its own camera culls, so it never obstructs the first-person view.
+## Build the visible character model so the player is seen by mirrors and other
+## players. For the local player it is moved to a dedicated visual layer that its
+## own camera culls, so it never obstructs the first-person view.
 func _build_body_mesh(is_local: bool) -> void:
-	var skin := StandardMaterial3D.new()
-	skin.albedo_color = Color(0.25, 0.5, 0.85)
-	skin.metallic = 0.1
-	skin.roughness = 0.7
-
 	var body := Node3D.new()
 	body.name = "BodyModel"
 	add_child(body)
 
-	var torso := MeshInstance3D.new()
-	var torso_mesh := CapsuleMesh.new()
-	torso_mesh.radius = 0.28
-	torso_mesh.height = 1.4
-	torso.mesh = torso_mesh
-	torso.material_override = skin
-	torso.position = Vector3(0.0, 0.8, 0.0)
-	body.add_child(torso)
-
-	var head := MeshInstance3D.new()
-	var head_mesh := SphereMesh.new()
-	head_mesh.radius = 0.2
-	head_mesh.height = 0.4
-	head.mesh = head_mesh
-	head.material_override = skin
-	head.position = Vector3(0.0, 1.65, 0.0)
-	body.add_child(head)
+	_model = CharacterModel.new()
+	body.add_child(_model)
+	_model.setup(PLAYER_MODEL)
 
 	if is_local:
-		torso.layers = OWN_BODY_VISUAL_LAYER
-		head.layers = OWN_BODY_VISUAL_LAYER
+		# Own body on its own visual layer, culled from the first-person camera.
+		_model.set_visual_layer(OWN_BODY_VISUAL_LAYER)
 		_camera.cull_mask &= ~OWN_BODY_VISUAL_LAYER
 
-	# Stylise the third-person body (outline); excludes the FP viewmodel.
+	# Stylise the third-person body (outline); dithering is a global post-process.
 	EntityVisuals.apply(body)
+	_prev_anim_pos = global_position
 
 func _input(event: InputEvent) -> void:
 	# Only look around while the cursor is captured. Overlays such as the buy menu
@@ -202,19 +190,37 @@ func _physics_process(delta: float) -> void:
 		# Remote player — interpolate toward synced position
 		global_position = global_position.lerp(sync_position, delta * 10.0)
 		rotation = sync_rotation
+		_update_animation(delta)
 		return
 
 	if emp_timer > 0.0:
 		emp_timer -= delta
 
 	if is_dead:
+		_update_animation(delta)
 		return
 
 	if is_downed:
 		_process_downed(delta)
+		_update_animation(delta)
 		return
 
 	_handle_movement(delta)
+	_update_animation(delta)
+
+## Drive the character model: death pose while down/dead, otherwise pick
+## idle / walk / run / jump from the planar speed derived from position change.
+func _update_animation(delta: float) -> void:
+	if _model == null:
+		return
+	if is_dead or is_downed:
+		_model.play_death()
+		return
+	var moved := global_position - _prev_anim_pos
+	_prev_anim_pos = global_position
+	var planar := Vector2(moved.x, moved.z).length() / maxf(delta, 0.0001)
+	var on_floor: bool = is_on_floor() if is_multiplayer_authority() else true
+	_model.set_locomotion(planar, on_floor)
 
 ## Downed players can't move or act; they just bleed out (gravity keeps them
 ## grounded). The HUD shows the countdown.
@@ -425,6 +431,9 @@ func respawn(pos: Vector3) -> void:
 	_velocity_y = 0.0
 	global_position = pos
 	sync_position = pos
+	_prev_anim_pos = pos
+	if _model != null:
+		_model.play_idle()
 	health_changed.emit(health, max_health)
 	revived.emit()
 	_broadcast_health()
