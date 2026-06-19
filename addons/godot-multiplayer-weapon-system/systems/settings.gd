@@ -52,7 +52,7 @@ var master_volume: float = DEFAULT_MASTER_VOLUME
 var crosshair_style: int = 0
 ## Per-entity view-angle outline shader.
 var entity_outline_enabled: bool = true
-## Global 1-bit dithering post-process.
+## Global ordered-dithering post-process.
 var dither_enabled: bool = true
 
 # Default events captured from the project InputMap at boot, used by reset.
