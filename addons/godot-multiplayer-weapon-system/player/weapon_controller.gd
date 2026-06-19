@@ -129,6 +129,8 @@ func _handle_input() -> void:
 		_switch_to("primary")
 	elif Input.is_action_just_pressed("weapon_secondary"):
 		_switch_to("secondary")
+	elif Input.is_action_just_pressed("weapon_melee"):
+		_switch_to("melee")
 
 	if Input.is_action_just_pressed("reload"):
 		_start_reload()
@@ -194,6 +196,7 @@ func _first_available_grenade() -> String:
 func refresh_loadout() -> void:
 	_sync_slot("primary", PlayerLoadout.primary_weapon)
 	_sync_slot("secondary", PlayerLoadout.secondary_weapon)
+	_sync_slot("melee", PlayerLoadout.melee_weapon)
 
 	if not _slots.has(_active_slot):
 		if _slots.has("primary"):
@@ -261,8 +264,8 @@ func _try_fire() -> void:
 	_broadcast_fire_effects()
 	ammo_changed.emit(weapon.mag, weapon.reserve)
 
-	# Auto-reload as soon as the magazine runs dry.
-	if weapon.mag == 0:
+	# Auto-reload as soon as the magazine runs dry (melee has no ammo).
+	if not weapon.is_melee() and weapon.mag == 0:
 		_start_reload()
 
 func _fire_hitscan(weapon: Weapon) -> void:
@@ -273,7 +276,7 @@ func _fire_hitscan(weapon: Weapon) -> void:
 	var spread := _current_spread(weapon)
 	for _i in weapon.pellets():
 		var dir := _aim_direction(spread)
-		var query := PhysicsRayQueryParameters3D.create(origin, origin + dir * MAX_DISTANCE)
+		var query := PhysicsRayQueryParameters3D.create(origin, origin + dir * weapon.range_m())
 		query.collide_with_bodies = true
 		query.collision_mask = 1  # layer 1 = world + characters; ignores thrown grenades
 		if _player:
@@ -420,6 +423,12 @@ func _update_viewmodel(weapon: Weapon) -> void:
 		return
 	for child in _viewmodel.get_children():
 		child.queue_free()
+
+	if weapon.is_melee():
+		# Knife: a short blade and a dark handle.
+		_add_gun_part(Vector3(0.02, 0.05, 0.26), Vector3(0.0, 0.0, -0.13), Color(0.75, 0.78, 0.82))
+		_add_gun_part(Vector3(0.04, 0.05, 0.1), Vector3(0.0, -0.01, 0.05), Color(0.12, 0.12, 0.14))
+		return
 
 	var color := _viewmodel_color(weapon.type())
 	var barrel_len := _barrel_length(weapon.type())

@@ -23,6 +23,7 @@ var _crosshair: Control = null
 var _weapon_label: Label = null
 var _ammo_label: Label = null
 var _reload_label: Label = null
+var _melee_active: bool = false
 
 ## Connect the HUD to its controller and build the UI.
 func bind(controller: WeaponController) -> void:
@@ -98,8 +99,14 @@ func _draw_x(center: Vector2, gap: float) -> void:
 func _on_weapon_changed(weapon: Weapon) -> void:
 	_weapon_label.text = weapon.display_name()
 	_reload_label.text = ""
+	_melee_active = weapon.is_melee()
+	if _melee_active:
+		_ammo_label.text = "—"
 
 func _on_ammo_changed(mag: int, reserve: int) -> void:
+	if _melee_active:
+		_ammo_label.text = "—"
+		return
 	_ammo_label.text = "%d / %d" % [mag, reserve]
 
 func _on_reload_started(_duration: float) -> void:

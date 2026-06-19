@@ -23,6 +23,9 @@ var primary_weapon: String = ""
 ## Secondary weapon id (free starting pistol by default)
 var secondary_weapon: String = "pistol_basic"
 
+## Melee weapon id (free starting knife by default)
+var melee_weapon: String = "knife_basic"
+
 ## Grenade inventory [grenade_id] = count
 var grenades: Dictionary = {}
 
@@ -35,10 +38,13 @@ func equip_weapon(weapon_id: String) -> void:
 	var data := WeaponDatabase.get_weapon(weapon_id)
 	if data.is_empty():
 		return
-	if data.get("type", "") == "pistol":
-		secondary_weapon = weapon_id
-	else:
-		primary_weapon = weapon_id
+	match data.get("type", ""):
+		"pistol":
+			secondary_weapon = weapon_id
+		"melee":
+			melee_weapon = weapon_id
+		_:
+			primary_weapon = weapon_id
 	loadout_changed.emit()
 
 ## Add one grenade of the given type to the inventory.

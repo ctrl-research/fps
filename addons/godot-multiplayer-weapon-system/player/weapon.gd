@@ -43,6 +43,14 @@ func display_name() -> String:
 func type() -> String:
 	return data.get("type", "")
 
+## Melee weapons have no ammo and a short hit range.
+func is_melee() -> bool:
+	return type() == "melee"
+
+## Maximum hitscan distance in metres (short for melee, effectively unlimited else).
+func range_m() -> float:
+	return float(data.get("range", 1000.0))
+
 func damage() -> float:
 	return float(data.get("damage", 0.0))
 
@@ -79,9 +87,11 @@ func pellets() -> int:
 	return 1
 
 func can_fire() -> bool:
-	return mag > 0
+	return is_melee() or mag > 0
 
 func consume() -> void:
+	if is_melee():
+		return  # melee has no ammo
 	mag = max(mag - 1, 0)
 
 func can_reload() -> bool:
