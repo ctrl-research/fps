@@ -84,30 +84,44 @@ func _build_ui() -> void:
 	minimap_check.toggled.connect(Settings.set_minimap_rotates)
 	minimap_row.add_child(minimap_check)
 
-	# Stylised shader toggles: per-entity outline + global dithering.
+	# Comic stylise shader: master toggle, colour mode, edge outline.
+	var stylize_row := HBoxContainer.new()
+	stylize_row.add_theme_constant_override("separation", 12)
+	vbox.add_child(stylize_row)
+	var stylize_label := Label.new()
+	stylize_label.text = "Comic shader"
+	stylize_label.custom_minimum_size = Vector2(200, 0)
+	stylize_row.add_child(stylize_label)
+	var stylize_check := CheckButton.new()
+	stylize_check.button_pressed = Settings.stylize_enabled
+	stylize_check.toggled.connect(Settings.set_stylize_enabled)
+	stylize_row.add_child(stylize_check)
+
+	var color_row := HBoxContainer.new()
+	color_row.add_theme_constant_override("separation", 12)
+	vbox.add_child(color_row)
+	var color_label := Label.new()
+	color_label.text = "Color mode"
+	color_label.custom_minimum_size = Vector2(200, 0)
+	color_row.add_child(color_label)
+	var color_option := OptionButton.new()
+	for mode_name in Settings.COLOR_MODES:
+		color_option.add_item(mode_name)
+	color_option.selected = Settings.color_mode
+	color_option.item_selected.connect(Settings.set_color_mode)
+	color_row.add_child(color_option)
+
 	var outline_row := HBoxContainer.new()
 	outline_row.add_theme_constant_override("separation", 12)
 	vbox.add_child(outline_row)
 	var outline_label := Label.new()
-	outline_label.text = "Entity outline"
+	outline_label.text = "Edge outlines"
 	outline_label.custom_minimum_size = Vector2(200, 0)
 	outline_row.add_child(outline_label)
 	var outline_check := CheckButton.new()
-	outline_check.button_pressed = Settings.entity_outline_enabled
-	outline_check.toggled.connect(Settings.set_entity_outline_enabled)
+	outline_check.button_pressed = Settings.outline_enabled
+	outline_check.toggled.connect(Settings.set_outline_enabled)
 	outline_row.add_child(outline_check)
-
-	var dither_row := HBoxContainer.new()
-	dither_row.add_theme_constant_override("separation", 12)
-	vbox.add_child(dither_row)
-	var dither_label := Label.new()
-	dither_label.text = "Dithering"
-	dither_label.custom_minimum_size = Vector2(200, 0)
-	dither_row.add_child(dither_label)
-	var dither_check := CheckButton.new()
-	dither_check.button_pressed = Settings.dither_enabled
-	dither_check.toggled.connect(Settings.set_dither_enabled)
-	dither_row.add_child(dither_check)
 
 	# Master volume.
 	var volume_row := HBoxContainer.new()
