@@ -205,7 +205,8 @@ func _add_static_box(pos: Vector3, box_size: Vector3, color: Color) -> void:
 	box_mesh.size = box_size
 	mesh.mesh = box_mesh
 	var material := StandardMaterial3D.new()
-	material.albedo_color = color
+	# Map geometry reads as grey (keeps light/dark contrast) for category clarity.
+	material.albedo_color = CategoryColors.to_map_grey(color)
 	mesh.material_override = material
 	body.add_child(mesh)
 

@@ -110,6 +110,16 @@ func set_visual_layer(mask: int) -> void:
 	for mesh in _meshes():
 		mesh.layers = mask
 
+## Recolour the whole model to a flat category base colour (still lit, so the
+## comic shader bands it). Used for ally/enemy readability.
+func set_tint(color: Color) -> void:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = color
+	mat.roughness = 0.9
+	mat.metallic = 0.0
+	for mesh in _meshes():
+		mesh.material_override = mat
+
 func meshes() -> Array:
 	return _meshes()
 

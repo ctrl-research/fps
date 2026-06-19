@@ -1,8 +1,10 @@
 // Global comic-book stylise post-process (replaces the old dither + outline).
 //
 // Two effects over the rendered 3D frame:
-//   1. Dynamic colour remapping — maps scene luminance onto a palette.
-//        Classic  : a stark, posterised palette (black / blue / red / grey).
+//   1. Dynamic colour remapping — keeps each object's own hue (so category base
+//        colours read: grey map, blue allies, red enemies, yellow interactables)
+//        and shades it by lighting.
+//        Classic  : posterised into a few hard luminance bands (stark, comic).
 //        Realistic: a saturation + contrast grade over the natural colours.
 //   2. Sobel edge outline — a luminance edge-detect that inks thick black lines
 //        around silhouettes and shading boundaries for a heavy comic look.
@@ -16,8 +18,10 @@ shader_type canvas_item;
 
 uniform sampler2D screen_tex : hint_screen_texture, filter_linear;
 
-// 0 = Classic palette, 1 = Realistic grade.
+// 0 = Classic posterise, 1 = Realistic grade.
 uniform int color_mode = 0;
+// Classic-mode luminance bands (lower = starker).
+uniform float classic_bands : hint_range(2.0, 8.0) = 4.0;
 
 uniform bool outline_enabled = true;
 // Edge sampling distance (screen pixels) — higher = thicker lines.
@@ -34,18 +38,11 @@ float luma(vec3 c) {
 	return dot(c, vec3(0.299, 0.587, 0.114));
 }
 
-// Stark, posterised palette keyed by luminance (black / blue / red / grey).
-vec3 classic_palette(float l) {
-	if (l < 0.18) {
-		return vec3(0.04, 0.04, 0.07);
-	} else if (l < 0.38) {
-		return vec3(0.13, 0.17, 0.45);
-	} else if (l < 0.58) {
-		return vec3(0.72, 0.15, 0.17);
-	} else if (l < 0.80) {
-		return vec3(0.53, 0.55, 0.61);
-	}
-	return vec3(0.93, 0.93, 0.96);
+// Keep the pixel's hue, snap its brightness to a few hard bands (cel/comic).
+vec3 classic_posterize(vec3 c) {
+	float l = luma(c);
+	float ql = (floor(l * classic_bands) + 0.5) / classic_bands;
+	return clamp(c * (ql / max(l, 0.001)), 0.0, 1.0);
 }
 
 // Keep the natural hue, push saturation and contrast.
@@ -71,7 +68,7 @@ float sobel(vec2 uv, vec2 px) {
 
 void fragment() {
 	vec3 src = texture(screen_tex, SCREEN_UV).rgb;
-	vec3 col = (color_mode == 0) ? classic_palette(luma(src)) : realistic_grade(src);
+	vec3 col = (color_mode == 0) ? classic_posterize(src) : realistic_grade(src);
 	if (outline_enabled) {
 		float e = sobel(SCREEN_UV, SCREEN_PIXEL_SIZE * outline_thickness);
 		col = mix(col, outline_color, step(outline_threshold, e));
