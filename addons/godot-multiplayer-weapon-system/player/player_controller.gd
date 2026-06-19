@@ -153,8 +153,7 @@ func _build_body_mesh(is_local: bool) -> void:
 		_model.set_visual_layer(OWN_BODY_VISUAL_LAYER)
 		_camera.cull_mask &= ~OWN_BODY_VISUAL_LAYER
 
-	# Stylise the third-person body (outline); dithering is a global post-process.
-	EntityVisuals.apply(body)
+	# Stylisation (outline + colour) is a global screen-space post-process now.
 	_prev_anim_pos = global_position
 
 func _input(event: InputEvent) -> void:

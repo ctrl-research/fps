@@ -19,6 +19,9 @@ const DEFAULT_MASTER_VOLUME: float = 0.75
 ## Crosshair shapes, in dropdown order (index stored as crosshair_style).
 const CROSSHAIR_STYLES: Array[String] = ["Cross", "Dot", "Circle", "X", "Star"]
 
+## Colour-remap modes for the stylise shader (index stored as color_mode).
+const COLOR_MODES: Array[String] = ["Classic", "Realistic"]
+
 ## Actions exposed in the rebinding UI, in display order.
 const BINDABLE_ACTIONS: Array[String] = [
 	"move_forward", "move_backward", "move_left", "move_right",
@@ -50,10 +53,12 @@ var minimap_rotates: bool = true
 var master_volume: float = DEFAULT_MASTER_VOLUME
 ## Index into CROSSHAIR_STYLES.
 var crosshair_style: int = 0
-## Per-entity view-angle outline shader.
-var entity_outline_enabled: bool = true
-## Global ordered-dithering post-process.
-var dither_enabled: bool = true
+## Comic stylise post-process master toggle.
+var stylize_enabled: bool = true
+## Colour-remap mode: index into COLOR_MODES (0 Classic, 1 Realistic).
+var color_mode: int = 0
+## Sobel edge-outline toggle.
+var outline_enabled: bool = true
 
 # Default events captured from the project InputMap at boot, used by reset.
 var _default_events: Dictionary = {}
@@ -107,13 +112,18 @@ func set_crosshair_style(index: int) -> void:
 	save()
 	settings_changed.emit()
 
-func set_entity_outline_enabled(value: bool) -> void:
-	entity_outline_enabled = value
+func set_stylize_enabled(value: bool) -> void:
+	stylize_enabled = value
 	save()
 	settings_changed.emit()
 
-func set_dither_enabled(value: bool) -> void:
-	dither_enabled = value
+func set_color_mode(index: int) -> void:
+	color_mode = clampi(index, 0, COLOR_MODES.size() - 1)
+	save()
+	settings_changed.emit()
+
+func set_outline_enabled(value: bool) -> void:
+	outline_enabled = value
 	save()
 	settings_changed.emit()
 
@@ -151,8 +161,9 @@ func save() -> void:
 	cfg.set_value("options", "minimap_rotates", minimap_rotates)
 	cfg.set_value("audio", "master_volume", master_volume)
 	cfg.set_value("options", "crosshair_style", crosshair_style)
-	cfg.set_value("options", "entity_outline_enabled", entity_outline_enabled)
-	cfg.set_value("options", "dither_enabled", dither_enabled)
+	cfg.set_value("options", "stylize_enabled", stylize_enabled)
+	cfg.set_value("options", "color_mode", color_mode)
+	cfg.set_value("options", "outline_enabled", outline_enabled)
 	for action in BINDABLE_ACTIONS:
 		if not InputMap.has_action(action):
 			continue
@@ -175,8 +186,9 @@ func _load() -> void:
 	minimap_rotates = cfg.get_value("options", "minimap_rotates", true)
 	master_volume = cfg.get_value("audio", "master_volume", DEFAULT_MASTER_VOLUME)
 	crosshair_style = cfg.get_value("options", "crosshair_style", 0)
-	entity_outline_enabled = cfg.get_value("options", "entity_outline_enabled", true)
-	dither_enabled = cfg.get_value("options", "dither_enabled", true)
+	stylize_enabled = cfg.get_value("options", "stylize_enabled", true)
+	color_mode = cfg.get_value("options", "color_mode", 0)
+	outline_enabled = cfg.get_value("options", "outline_enabled", true)
 	if not cfg.has_section("keys"):
 		return
 	for action in cfg.get_section_keys("keys"):
