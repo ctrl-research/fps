@@ -194,6 +194,11 @@ func _make_bind_row(action: String) -> HBoxContainer:
 
 func _input(event: InputEvent) -> void:
 	if _listening_action == "":
+		# Esc closes the menu. Works on web too: the cursor is already unlocked
+		# while a menu is open, so the browser delivers the keypress here.
+		if _is_cancel(event):
+			get_viewport().set_input_as_handled()
+			_on_close_pressed()
 		return
 	# Capture the first key or mouse button as the new binding.
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -237,6 +242,13 @@ func _on_reset_pressed() -> void:
 func _on_close_pressed() -> void:
 	closed.emit()
 	queue_free()
+
+## True for an Esc / ui_cancel press (used to dismiss the menu).
+func _is_cancel(event: InputEvent) -> bool:
+	if event.is_action_pressed("ui_cancel"):
+		return true
+	return event is InputEventKey and event.pressed and not event.echo \
+		and event.keycode == KEY_ESCAPE
 
 func _refresh() -> void:
 	for action in _rebind_buttons:
