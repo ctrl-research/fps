@@ -233,6 +233,21 @@ func _setup_default_weapons() -> void:
 		"mobility_penalty": 0.02
 	})
 
+	# Melee (no ammo, short range; fills the dedicated melee slot)
+	register_weapon("knife_basic", {
+		"name": "Combat Knife",
+		"type": "melee",
+		"damage": 55,
+		"fire_rate": 0.45,
+		"mag_size": 0,
+		"reserve_ammo": 0,
+		"recoil": 0.04,
+		"spread": 0.0,
+		"range": 2.4,
+		"price": 0,
+		"mobility_penalty": 0.0
+	})
+
 ## Setup default grenades
 func _setup_default_grenades() -> void:
 	register_grenade("frag", {

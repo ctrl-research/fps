@@ -26,7 +26,7 @@ const COLOR_MODES: Array[String] = ["Classic", "Realistic"]
 const BINDABLE_ACTIONS: Array[String] = [
 	"move_forward", "move_backward", "move_left", "move_right",
 	"jump", "sprint", "crouch", "shoot", "reload",
-	"weapon_primary", "weapon_secondary", "grenade", "buy",
+	"weapon_primary", "weapon_secondary", "weapon_melee", "grenade", "buy",
 ]
 
 ## Friendly labels for the actions above.
@@ -42,6 +42,7 @@ const ACTION_LABELS: Dictionary = {
 	"reload": "Reload",
 	"weapon_primary": "Primary Weapon",
 	"weapon_secondary": "Secondary Weapon",
+	"weapon_melee": "Melee Weapon",
 	"grenade": "Throw Grenade",
 	"buy": "Buy Menu",
 }
