@@ -45,6 +45,18 @@ const RECOIL_RECOVER_SPEED: float = 1.2
 ## How long the muzzle flash stays visible, in seconds.
 const FLASH_TIME: float = 0.05
 
+# Throwable arcs: left-click mid-range throw vs right-click short lob.
+const THROW_MID_SPEED: float = 18.0
+const THROW_MID_LIFT: float = 3.5
+const THROW_LOB_SPEED: float = 8.0
+const THROW_LOB_LIFT: float = 6.0
+const THROW_MID_COLOR: Color = Color(0.4, 0.85, 1.0)
+const THROW_LOB_COLOR: Color = Color(1.0, 0.82, 0.3)
+## Grenade falls under the project's default 3D gravity (not the player's).
+const GRENADE_GRAVITY: float = 9.8
+const TRAJ_STEPS: int = 40
+const TRAJ_DT: float = 0.05
+
 var _player: PlayerController = null
 var _camera: Camera3D = null
 var _is_local: bool = false
@@ -60,10 +72,13 @@ var _reloading: bool = false
 var _reload_timer: float = 0.0
 var _recoil_accum: float = 0.0
 
-# Grenade cooking (hold to cook, release to throw).
-var _cooking: bool = false
-var _cook_time: float = 0.0
-var _cook_grenade_id: String = ""
+# Throwable mode: G pulls out a grenade (and cycles types); left-click throws
+# mid-range, right-click lobs short. Holding either previews the trajectory.
+var _throwable_active: bool = false
+var _throwable_types: Array = []   # carried grenade ids with count > 0
+var _throwable_index: int = 0
+var _throw_aim: int = 0            # 0 none, 1 mid (LMB), 2 lob (RMB)
+var _trajectory: ThrowTrajectory = null
 
 var _muzzle: Node3D = null
 var _flash_mesh: MeshInstance3D = null
@@ -109,13 +124,14 @@ func _process(delta: float) -> void:
 		if _reload_timer <= 0.0:
 			_complete_reload()
 
-	if _cooking:
-		_cook_time += delta
-		if _cook_time >= Grenade.FUSE_TIME:
-			_release_grenade()  # held too long — cooks off on throw
-
 	_recover_recoil(delta)
 	_handle_input()
+
+	# Preview the throw arc while a throw button is held in throwable mode.
+	if _throwable_active and _throw_aim != 0:
+		_show_trajectory(_throw_aim == 2)
+	elif _trajectory != null:
+		_trajectory.hide_arc()
 
 # === Input ===
 
@@ -123,24 +139,35 @@ func _handle_input() -> void:
 	# Weapons are inert unless the player is in control of the view. The buy
 	# menu (and any overlay) releases the mouse, which suppresses combat.
 	if Input.get_mouse_mode() != Input.MOUSE_MODE_CAPTURED:
+		_throw_aim = 0
 		return
 	if _player and (_player.is_dead or _player.is_downed):
+		_throw_aim = 0
 		return
 
+	# Switching to a weapon puts the throwable away.
 	if Input.is_action_just_pressed("weapon_primary"):
+		_exit_throwable()
 		_switch_to("primary")
 	elif Input.is_action_just_pressed("weapon_secondary"):
+		_exit_throwable()
 		_switch_to("secondary")
 	elif Input.is_action_just_pressed("weapon_melee"):
+		_exit_throwable()
 		_switch_to("melee")
+
+	# G pulls out a throwable; pressing it again cycles between carried types.
+	if Input.is_action_just_pressed("grenade"):
+		_toggle_throwable()
+
+	# In throwable mode, left-click throws mid-range and right-click lobs short;
+	# the gun's fire/reload are suppressed.
+	if _throwable_active:
+		_handle_throw_input()
+		return
 
 	if Input.is_action_just_pressed("reload"):
 		_start_reload()
-
-	if Input.is_action_just_pressed("grenade"):
-		_begin_cook()
-	if Input.is_action_just_released("grenade"):
-		_release_grenade()
 
 	var weapon := _active()
 	if weapon == null:
@@ -153,43 +180,116 @@ func _handle_input() -> void:
 
 # === Grenades ===
 
-## Press starts cooking the first grenade carried; release throws it with the
-## fuse already counted down. Holding past the full fuse cooks it off.
-func _begin_cook() -> void:
-	if _cooking:
+## Enter throwable mode (or cycle to the next carried type if already in it).
+func _toggle_throwable() -> void:
+	_refresh_throwable_types()
+	if _throwable_types.is_empty():
 		return
-	var grenade_id := _first_available_grenade()
-	if grenade_id == "":
-		return
-	_cooking = true
-	_cook_time = 0.0
-	_cook_grenade_id = grenade_id
+	if not _throwable_active:
+		_throwable_active = true
+		_throwable_index = 0
+	else:
+		_throwable_index = (_throwable_index + 1) % _throwable_types.size()
+	_throw_aim = 0
 
-func _release_grenade() -> void:
-	if not _cooking:
+## Leave throwable mode (back to the held weapon).
+func _exit_throwable() -> void:
+	if not _throwable_active:
 		return
-	_cooking = false
-	var grenade_id := _cook_grenade_id
-	_cook_grenade_id = ""
-	if _camera == null or PlayerLoadout.grenades.get(grenade_id, 0) <= 0:
+	_throwable_active = false
+	_throw_aim = 0
+	if _trajectory != null:
+		_trajectory.hide_arc()
+
+## Left-click aims/throws mid-range; right-click aims/lobs short. The aim is set
+## on press (so _process previews the arc) and the grenade flies on release.
+func _handle_throw_input() -> void:
+	if Input.is_action_just_pressed("shoot"):
+		_throw_aim = 1
+	if Input.is_action_just_pressed("throw_lob"):
+		_throw_aim = 2
+	if Input.is_action_just_released("shoot") and _throw_aim == 1:
+		_do_throw(false)
+	if Input.is_action_just_released("throw_lob") and _throw_aim == 2:
+		_do_throw(true)
+
+func _do_throw(is_lob: bool) -> void:
+	_throw_aim = 0
+	if _trajectory != null:
+		_trajectory.hide_arc()
+	var grenade_id := _current_throwable_id()
+	if grenade_id == "" or _camera == null or PlayerLoadout.grenades.get(grenade_id, 0) <= 0:
 		return
 	var data := WeaponDatabase.get_grenade(grenade_id)
 	PlayerLoadout.use_grenade(grenade_id)
 
+	var speed: float = THROW_LOB_SPEED if is_lob else THROW_MID_SPEED
+	var lift: float = THROW_LOB_LIFT if is_lob else THROW_MID_LIFT
+	var forward := -_camera.global_transform.basis.z
 	var scene: PackedScene = load(GRENADE_SCENE)
 	var grenade: Grenade = scene.instantiate()
-	var forward := -_camera.global_transform.basis.z
 	# Set the spawn position before add_child (it's a physics body).
 	grenade.position = _camera.global_position + forward * 0.6
 	var world := _player.get_parent() if _player else get_tree().current_scene
 	world.add_child(grenade)
-	grenade.throw_from(data, _peer_id(), forward, maxf(Grenade.FUSE_TIME - _cook_time, 0.05))
+	grenade.throw_from(data, _peer_id(), forward, Grenade.FUSE_TIME, speed, lift)
 
-func _first_available_grenade() -> String:
+	# Drop empty types from the cycle; leave throwable mode if nothing's left.
+	_refresh_throwable_types()
+	if _throwable_types.is_empty():
+		_exit_throwable()
+	else:
+		_throwable_index = clampi(_throwable_index, 0, _throwable_types.size() - 1)
+
+## Carried grenade ids that still have ammo, in a stable order.
+func _refresh_throwable_types() -> void:
+	_throwable_types.clear()
 	for grenade_id in PlayerLoadout.grenades:
 		if PlayerLoadout.grenades[grenade_id] > 0:
-			return grenade_id
+			_throwable_types.append(grenade_id)
+	if _throwable_index >= _throwable_types.size():
+		_throwable_index = 0
+
+func _current_throwable_id() -> String:
+	if _throwable_index < _throwable_types.size():
+		return _throwable_types[_throwable_index]
 	return ""
+
+## Show the dotted arc for the current throw type, simulating the grenade's
+## flight (same gravity) until it hits geometry or runs out of steps.
+func _show_trajectory(is_lob: bool) -> void:
+	if _camera == null:
+		return
+	if _trajectory == null:
+		_trajectory = ThrowTrajectory.new()
+		# Parented to the controller (freed with the player); top_level keeps it
+		# in world space regardless.
+		add_child(_trajectory)
+	var speed: float = THROW_LOB_SPEED if is_lob else THROW_MID_SPEED
+	var lift: float = THROW_LOB_LIFT if is_lob else THROW_MID_LIFT
+	var color: Color = THROW_LOB_COLOR if is_lob else THROW_MID_COLOR
+	_trajectory.show_arc(_simulate_arc(speed, lift), color)
+
+func _simulate_arc(speed: float, lift: float) -> Array:
+	var points: Array = []
+	var forward := -_camera.global_transform.basis.z
+	var pos := _camera.global_position + forward * 0.6
+	var vel := forward * speed + Vector3.UP * lift
+	var space := _camera.get_world_3d().direct_space_state
+	for _i in TRAJ_STEPS:
+		points.append(pos)
+		var next := pos + vel * TRAJ_DT
+		vel.y -= GRENADE_GRAVITY * TRAJ_DT
+		var query := PhysicsRayQueryParameters3D.create(pos, next)
+		query.collision_mask = 1
+		if _player:
+			query.exclude = [_player.get_rid()]
+		var hit := space.intersect_ray(query)
+		if not hit.is_empty():
+			points.append(hit.get("position"))
+			break
+		pos = next
+	return points
 
 # === Loadout / switching ===
 
