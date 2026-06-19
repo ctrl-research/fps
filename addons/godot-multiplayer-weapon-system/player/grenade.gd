@@ -29,6 +29,10 @@ var attacker_id: int = 0
 var _fuse: float = FUSE_TIME
 var _detonated: bool = false
 
+func _ready() -> void:
+	# Stylise the grenade body (outline + dither), like other entities.
+	EntityVisuals.apply(self)
+
 ## Configure from a WeaponDatabase grenade entry and throw along `direction`.
 ## `fuse_remaining` lets the thrower pass a cooked-down fuse. Call after add_child
 ## (its position should be set before add_child, since it's a physics body).

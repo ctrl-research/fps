@@ -54,8 +54,13 @@ func _ready() -> void:
 	_mesh.material_override = _material
 	_head.material_override = _material
 	_muzzle_flash.visible = false
+	_muzzle_flash.add_to_group(EntityVisuals.EXCLUDE_GROUP)
 	_build_tracer()
 	_reset()
+
+	# Stylise the bot body (outline + dither). The shared base material's runtime
+	# tints (hit flash, downed colour) still show through the additive overlay.
+	EntityVisuals.apply(self)
 
 func _physics_process(delta: float) -> void:
 	if _dead:

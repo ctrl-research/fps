@@ -29,6 +29,8 @@ var _age: float = 0.0
 func _ready() -> void:
 	body_entered.connect(_on_body_entered)
 	monitoring = true
+	# Stylise the projectile body (outline + dither), like other entities.
+	EntityVisuals.apply(self)
 
 ## Configure the projectile before adding it to the scene.
 func launch(from: Vector3, direction: Vector3) -> void:

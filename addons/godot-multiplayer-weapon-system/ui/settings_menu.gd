@@ -84,6 +84,31 @@ func _build_ui() -> void:
 	minimap_check.toggled.connect(Settings.set_minimap_rotates)
 	minimap_row.add_child(minimap_check)
 
+	# Entity shader toggles (view-angle outline + dithering grain).
+	var outline_row := HBoxContainer.new()
+	outline_row.add_theme_constant_override("separation", 12)
+	vbox.add_child(outline_row)
+	var outline_label := Label.new()
+	outline_label.text = "Entity outline"
+	outline_label.custom_minimum_size = Vector2(200, 0)
+	outline_row.add_child(outline_label)
+	var outline_check := CheckButton.new()
+	outline_check.button_pressed = Settings.entity_outline_enabled
+	outline_check.toggled.connect(Settings.set_entity_outline_enabled)
+	outline_row.add_child(outline_check)
+
+	var dither_row := HBoxContainer.new()
+	dither_row.add_theme_constant_override("separation", 12)
+	vbox.add_child(dither_row)
+	var dither_label := Label.new()
+	dither_label.text = "Entity dithering"
+	dither_label.custom_minimum_size = Vector2(200, 0)
+	dither_row.add_child(dither_label)
+	var dither_check := CheckButton.new()
+	dither_check.button_pressed = Settings.entity_dither_enabled
+	dither_check.toggled.connect(Settings.set_entity_dither_enabled)
+	dither_row.add_child(dither_check)
+
 	# Master volume.
 	var volume_row := HBoxContainer.new()
 	volume_row.add_theme_constant_override("separation", 12)
