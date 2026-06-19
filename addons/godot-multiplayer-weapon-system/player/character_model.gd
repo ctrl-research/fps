@@ -127,7 +127,9 @@ func meshes() -> Array:
 # Tunables: where a held weapon sits relative to the right-hand bone. KayKit hand
 # bones vary in rest orientation, so expect to nudge these once in-engine.
 const HAND_OFFSET: Vector3 = Vector3(0.0, 0.02, -0.08)
-const HAND_ROTATION_DEG: Vector3 = Vector3(0.0, 90.0, 0.0)
+# Barrel was pointing up/down in the hand — pitch it to level/forward. If it now
+# points the wrong way (down/backward), flip this X sign or add 180 on Y.
+const HAND_ROTATION_DEG: Vector3 = Vector3(-90.0, 0.0, 0.0)
 
 ## A node parented to the model's right-hand bone, for holding a weapon (created
 ## on first use). The weapon mesh is added under the returned socket.
