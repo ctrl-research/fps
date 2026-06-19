@@ -166,6 +166,9 @@ func _build_body_mesh(is_local: bool) -> void:
 		head.layers = OWN_BODY_VISUAL_LAYER
 		_camera.cull_mask &= ~OWN_BODY_VISUAL_LAYER
 
+	# Stylise the third-person body (outline + dither); excludes the FP viewmodel.
+	EntityVisuals.apply(body)
+
 func _input(event: InputEvent) -> void:
 	# Only look around while the cursor is captured. Overlays such as the buy menu
 	# release the cursor, which must suppress camera look without spinning the view.

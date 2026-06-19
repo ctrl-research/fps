@@ -123,6 +123,7 @@ PlayerLoadout="*res://addons/godot-multiplayer-weapon-system/systems/player_load
 ProjectSettings="*res://addons/godot-multiplayer-weapon-system/systems/project_settings.gd"
 MultiplayerManager="*res://addons/godot-multiplayer-weapon-system/systems/multiplayer_manager.gd"
 Settings="*res://addons/godot-multiplayer-weapon-system/systems/settings.gd"
+EntityVisuals="*res://addons/godot-multiplayer-weapon-system/systems/entity_visuals.gd"
 
 [rendering]
 
