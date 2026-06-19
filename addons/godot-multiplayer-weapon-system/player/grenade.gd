@@ -30,7 +30,7 @@ var _fuse: float = FUSE_TIME
 var _detonated: bool = false
 
 func _ready() -> void:
-	# Stylise the grenade body (outline + dither), like other entities.
+	# Stylise the grenade body (outline), like other entities.
 	EntityVisuals.apply(self)
 
 ## Configure from a WeaponDatabase grenade entry and throw along `direction`.

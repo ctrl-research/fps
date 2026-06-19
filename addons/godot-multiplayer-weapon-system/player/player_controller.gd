@@ -166,7 +166,7 @@ func _build_body_mesh(is_local: bool) -> void:
 		head.layers = OWN_BODY_VISUAL_LAYER
 		_camera.cull_mask &= ~OWN_BODY_VISUAL_LAYER
 
-	# Stylise the third-person body (outline + dither); excludes the FP viewmodel.
+	# Stylise the third-person body (outline); excludes the FP viewmodel.
 	EntityVisuals.apply(body)
 
 func _input(event: InputEvent) -> void:

@@ -2,8 +2,9 @@ extends Node
 # No `class_name`: registered as the `EntityVisuals` autoload. A matching global
 # class would shadow the singleton and break clean compiles.
 """
-Applies the shared stylised shader (view-angle outline + dithering grain) to
-entity models — players, bots, throwables, drops — so they share one look.
+Applies the shared view-angle outline shader to entity models — players, bots,
+throwables, drops — so they share one look. (Dithering is a separate global
+post-process; see PostProcess / shaders/dither_post.gdshader.)
 
 The shader is attached as a *next_pass* over each mesh's existing material, which
 keeps the entity's own colour/shading (and runtime tints like a bot's hit-flash)
@@ -29,7 +30,7 @@ func _ready() -> void:
 	_refresh_toggles()
 	Settings.settings_changed.connect(_refresh_toggles)
 
-## Attach the outline/dither overlay to every eligible mesh under `root`.
+## Attach the outline overlay to every eligible mesh under `root`.
 func apply(root: Node) -> void:
 	if _overlay == null:
 		return
@@ -72,9 +73,8 @@ func _is_shadeable(mesh: MeshInstance3D) -> bool:
 			return false
 	return true
 
-## Sync the shared overlay's on/off uniforms from Settings (affects all entities).
+## Sync the shared overlay's on/off uniform from Settings (affects all entities).
 func _refresh_toggles() -> void:
 	if _overlay == null:
 		return
 	_overlay.set_shader_parameter("outline_enabled", Settings.entity_outline_enabled)
-	_overlay.set_shader_parameter("dither_enabled", Settings.entity_dither_enabled)
