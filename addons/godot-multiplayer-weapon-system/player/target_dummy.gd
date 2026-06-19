@@ -76,7 +76,8 @@ func _reset() -> void:
 	_label.text = "%d" % int(health)
 	_update_color()
 
-## Interactable yellow, darkening as health drops for at-a-glance feedback.
+## Enemy red (the dummies are stationary, non-firing practice enemies),
+## darkening as health drops for at-a-glance feedback.
 func _update_color() -> void:
 	var t: float = clamp(health / max_health, 0.0, 1.0)
-	_material.albedo_color = CategoryColors.INTERACTABLE.darkened((1.0 - t) * 0.5)
+	_material.albedo_color = CategoryColors.ENEMY.darkened((1.0 - t) * 0.5)
