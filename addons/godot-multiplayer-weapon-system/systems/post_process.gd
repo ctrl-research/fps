@@ -5,7 +5,7 @@ extends Node
 Global screen-space post-processing.
 
 Owns a screen-filling ColorRect on a top CanvasLayer that survives scene changes
-(it's a child of this autoload), running the 1-bit dithering shader over the
+(it's a child of this autoload), running the ordered-dithering shader over the
 whole composited frame. Toggled via Settings.dither_enabled.
 """
 

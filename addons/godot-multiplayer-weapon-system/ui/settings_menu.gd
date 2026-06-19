@@ -84,7 +84,7 @@ func _build_ui() -> void:
 	minimap_check.toggled.connect(Settings.set_minimap_rotates)
 	minimap_row.add_child(minimap_check)
 
-	# Stylised shader toggles: per-entity outline + global 1-bit dithering.
+	# Stylised shader toggles: per-entity outline + global dithering.
 	var outline_row := HBoxContainer.new()
 	outline_row.add_theme_constant_override("separation", 12)
 	vbox.add_child(outline_row)
@@ -101,7 +101,7 @@ func _build_ui() -> void:
 	dither_row.add_theme_constant_override("separation", 12)
 	vbox.add_child(dither_row)
 	var dither_label := Label.new()
-	dither_label.text = "Dithering (1-bit)"
+	dither_label.text = "Dithering"
 	dither_label.custom_minimum_size = Vector2(200, 0)
 	dither_row.add_child(dither_label)
 	var dither_check := CheckButton.new()

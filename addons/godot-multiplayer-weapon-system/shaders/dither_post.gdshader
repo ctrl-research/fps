@@ -1,17 +1,17 @@
-// Global 1-bit ordered-dithering post-process.
+// Global ordered-dithering post-process.
 //
-// A full-screen canvas_item shader: reads the composited frame, reduces it to a
-// single bit per pixel (two colours) using a 4x4 Bayer threshold on luminance.
-// The classic Macintosh / Return-of-the-Obra-Dinn look.
+// A full-screen canvas_item shader: reads the composited frame and applies a 4x4
+// Bayer ordered dither while quantising each RGB channel to a few levels. This
+// keeps every pixel's colour but adds a grainy, reduced-depth texture (a retro
+// dithered look) instead of converting to greyscale.
 //
 // Mounted on a screen-filling ColorRect on a top CanvasLayer by PostProcess, so
 // it covers the whole screen. gl_compatibility-safe (2D screen-texture read).
 shader_type canvas_item;
 
 uniform sampler2D screen_tex : hint_screen_texture, filter_nearest;
-// The two output colours (1 bit = 2 states). Default pure black / white.
-uniform vec3 dark_color : source_color = vec3(0.0);
-uniform vec3 light_color : source_color = vec3(1.0);
+// Quantisation steps per colour channel. Lower = stronger dither texture.
+uniform float color_levels : hint_range(2.0, 16.0) = 4.0;
 // Larger = chunkier dither cells (pattern scaled down in screen space).
 uniform float dither_scale : hint_range(1.0, 8.0) = 1.0;
 
@@ -29,8 +29,10 @@ float bayer(vec2 frag) {
 
 void fragment() {
 	vec3 c = texture(screen_tex, SCREEN_UV).rgb;
-	float lum = dot(c, vec3(0.299, 0.587, 0.114));
-	float threshold = bayer(FRAGCOORD.xy / dither_scale);
-	float bit = step(threshold, lum);
-	COLOR = vec4(mix(dark_color, light_color, bit), 1.0);
+	// Per-channel ordered dithering: nudge by the Bayer offset, then snap to the
+	// nearest level. Hue is preserved; the pattern shows up as texture/grain.
+	float offset = bayer(FRAGCOORD.xy / dither_scale) - 0.5;
+	float steps = color_levels - 1.0;
+	vec3 dithered = round(c * steps + offset) / steps;
+	COLOR = vec4(clamp(dithered, 0.0, 1.0), 1.0);
 }
