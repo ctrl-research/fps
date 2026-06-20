@@ -37,6 +37,7 @@ var _last_winner: int = -1
 var _resolving: bool = false
 
 var _info_label: Label = null
+var _announce_label: Label = null
 var _draft: EvolutionDraft = null
 
 func _ready() -> void:
@@ -53,6 +54,7 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	GameState.match_over = false
+	Modifiers.clear_active()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("disconnect_network") and not is_instance_valid(_draft):
@@ -82,6 +84,8 @@ func _on_player_pick(modifier_id: String) -> void:
 	_begin_live()
 
 func _apply_all_stats() -> void:
+	# Publish the stacks so the scoreboard (Tab) can show them.
+	Modifiers.set_active(_team_mods, 0)
 	if is_instance_valid(_player):
 		_player.apply_stats(Modifiers.stats_for(_team_mods, 0))
 	var bot_stats := Modifiers.stats_for(_team_mods, 1)
@@ -98,7 +102,28 @@ func _begin_live() -> void:
 		if is_instance_valid(bot):
 			bot.reset_for_round()
 	_set_combat_active(true)
+	_announce_evolutions()
 	_update_info()
+
+## Briefly announce what each team drafted this round.
+func _announce_evolutions() -> void:
+	if _announce_label == null:
+		return
+	var player_pick: String = _team_mods[0].back() if not _team_mods[0].is_empty() else ""
+	var enemy_pick: String = _team_mods[1].back() if not _team_mods[1].is_empty() else ""
+	_announce_label.text = "EVOLUTION   —   You: %s      Enemy: %s" % [_signed(player_pick), _signed(enemy_pick)]
+	_announce_label.visible = true
+	var tween := create_tween()
+	tween.tween_interval(3.5)
+	tween.tween_callback(func() -> void: _announce_label.visible = false)
+
+## "+Name" for a buff, "-Name" for a debuff.
+func _signed(modifier_id: String) -> String:
+	if modifier_id == "":
+		return "—"
+	var m := Modifiers.get_mod(modifier_id)
+	var prefix := "+" if m.get("kind") == "buff" else "-"
+	return "%s%s" % [prefix, m.get("name", modifier_id)]
 
 ## Freeze/unfreeze the player and bots (so combat pauses during the draft).
 func _set_combat_active(active: bool) -> void:
@@ -189,6 +214,18 @@ func _build_hud() -> void:
 	_info_label.add_theme_font_size_override("font_size", 20)
 	_info_label.add_theme_color_override("font_color", Color(0.7, 0.9, 1.0))
 	layer.add_child(_info_label)
+
+	# Round-start announcement of each team's drafted evolution (auto-hides).
+	_announce_label = Label.new()
+	_announce_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_announce_label.offset_top = 84.0
+	_announce_label.offset_left = -400.0
+	_announce_label.offset_right = 400.0
+	_announce_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_announce_label.add_theme_font_size_override("font_size", 26)
+	_announce_label.add_theme_color_override("font_color", Color(1.0, 0.95, 0.7))
+	_announce_label.visible = false
+	layer.add_child(_announce_label)
 
 func _update_info() -> void:
 	if _info_label:

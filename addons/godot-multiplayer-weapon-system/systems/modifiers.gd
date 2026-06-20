@@ -30,6 +30,38 @@ const CATALOG: Array[Dictionary] = [
 	{"id": "jam", "name": "Jam", "kind": "debuff", "target": "enemy", "stat": "fire_rate", "value": 1.25, "desc": "Enemies -20% fire rate"},
 ]
 
+# Active stacks for the current Evolution run, so the HUD scoreboard can show
+# the local player's buffs/debuffs. Set by the mode; cleared on exit.
+static var active_team_mods: Dictionary = {}
+static var active_local_team: int = 0
+
+static func set_active(team_mods: Dictionary, local_team: int) -> void:
+	active_team_mods = team_mods
+	active_local_team = local_team
+
+static func clear_active() -> void:
+	active_team_mods = {}
+
+static func has_active() -> bool:
+	return not active_team_mods.is_empty()
+
+## Buffs the local player benefits from (own team's self-buffs).
+static func local_buffs() -> Array:
+	var out: Array = []
+	for id in active_team_mods.get(active_local_team, []):
+		if get_mod(id).get("target") == "self":
+			out.append(id)
+	return out
+
+## Debuffs afflicting the local player (enemy team's enemy-debuffs).
+static func local_debuffs() -> Array:
+	var out: Array = []
+	var enemy := 1 - active_local_team
+	for id in active_team_mods.get(enemy, []):
+		if get_mod(id).get("target") == "enemy":
+			out.append(id)
+	return out
+
 static func get_mod(id: String) -> Dictionary:
 	for m in CATALOG:
 		if m["id"] == id:
