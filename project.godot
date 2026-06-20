@@ -134,6 +134,7 @@ ProjectSettings="*res://addons/godot-multiplayer-weapon-system/systems/project_s
 MultiplayerManager="*res://addons/godot-multiplayer-weapon-system/systems/multiplayer_manager.gd"
 Settings="*res://addons/godot-multiplayer-weapon-system/systems/settings.gd"
 PostProcess="*res://addons/godot-multiplayer-weapon-system/systems/post_process.gd"
+GameAudio="*res://addons/godot-multiplayer-weapon-system/systems/game_audio.gd"
 
 [rendering]
 

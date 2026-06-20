@@ -99,6 +99,12 @@ var _model: CharacterModel = null
 # Previous position, for deriving planar speed to pick the locomotion animation.
 var _prev_anim_pos: Vector3 = Vector3.ZERO
 
+# Footsteps: only running is audible (walking is silent). Computed per-body on
+# every client from movement, so footsteps are spatial for all players.
+const FOOTSTEP_RUN_SPEED: float = 7.0
+const FOOTSTEP_INTERVAL: float = 0.32
+var _footstep_timer: float = 0.0
+
 func _ready() -> void:
 	health = max_health
 
@@ -249,6 +255,17 @@ func _update_animation(delta: float) -> void:
 	var planar := Vector2(moved.x, moved.z).length() / maxf(delta, 0.0001)
 	var on_floor: bool = is_on_floor() if is_multiplayer_authority() else true
 	_model.set_locomotion(planar, on_floor)
+	_update_footsteps(delta, planar, on_floor)
+
+## Play spatial footsteps while running (walking is silent). Runs for every body.
+func _update_footsteps(delta: float, planar: float, on_floor: bool) -> void:
+	if not on_floor or planar < FOOTSTEP_RUN_SPEED:
+		_footstep_timer = 0.0
+		return
+	_footstep_timer -= delta
+	if _footstep_timer <= 0.0:
+		_footstep_timer = FOOTSTEP_INTERVAL
+		GameAudio.play_at(global_position, "footstep", "footstep")
 
 ## Downed players can't move or act; they just bleed out (gravity keeps them
 ## grounded). The HUD shows the countdown.
@@ -438,6 +455,9 @@ func _enter_downed() -> void:
 	is_downed = true
 	bleedout_timer = DOWNED_DURATION
 	downed.emit()
+	# The downed player hears their own heartbeat (local only).
+	if is_multiplayer_authority():
+		GameAudio.start_heartbeat()
 	# Report to the round machine (host-authoritative; no-op outside a live round).
 	GameState.report_death(authority_peer_id, _last_attacker_id)
 
@@ -445,6 +465,8 @@ func _bleed_out() -> void:
 	is_downed = false
 	is_dead = true
 	health = 0.0
+	if is_multiplayer_authority():
+		GameAudio.stop_heartbeat()
 	health_changed.emit(0.0, max_health)
 	_broadcast_health()
 	died.emit()
@@ -462,6 +484,8 @@ func respawn(pos: Vector3) -> void:
 	_prev_anim_pos = pos
 	if _model != null:
 		_model.play_idle()
+	if is_multiplayer_authority():
+		GameAudio.stop_heartbeat()
 	health_changed.emit(health, max_health)
 	revived.emit()
 	_broadcast_health()

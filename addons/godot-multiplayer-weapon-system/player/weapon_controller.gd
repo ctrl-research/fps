@@ -83,7 +83,6 @@ var _trajectory: ThrowTrajectory = null
 var _muzzle: Node3D = null
 var _flash_mesh: MeshInstance3D = null
 var _flash_light: OmniLight3D = null
-var _audio: AudioStreamPlayer3D = null
 var _flash_timer: float = 0.0
 var _viewmodel: Node3D = null
 # Third-person weapon parented to the model's hand bone (mirror / other players).
@@ -191,6 +190,8 @@ func _toggle_throwable() -> void:
 	else:
 		_throwable_index = (_throwable_index + 1) % _throwable_types.size()
 	_throw_aim = 0
+	if _player:
+		GameAudio.play_at(_player.global_position, "grenade_pull", "movement")
 
 ## Leave throwable mode (back to the held weapon).
 func _exit_throwable() -> void:
@@ -233,6 +234,7 @@ func _do_throw(is_lob: bool) -> void:
 	var world := _player.get_parent() if _player else get_tree().current_scene
 	world.add_child(grenade)
 	grenade.throw_from(data, _peer_id(), forward, Grenade.FUSE_TIME, speed, lift)
+	GameAudio.play_at(grenade.global_position, "grenade_throw", "grenade")
 
 	# Drop empty types from the cycle; leave throwable mode if nothing's left.
 	_refresh_throwable_types()
@@ -359,6 +361,8 @@ func _try_fire() -> void:
 	if weapon.is_melee():
 		_fire_hitscan(weapon)
 		_swing_viewmodel()
+		if _player:
+			GameAudio.play_at(_player.global_position, "swing", "movement")
 		return
 
 	if weapon.fire_mode() == "projectile":
@@ -369,8 +373,8 @@ func _try_fire() -> void:
 	_apply_recoil(weapon)
 	_spray_index += 1
 
-	_play_fire_effects()
-	_broadcast_fire_effects()
+	_play_fire_effects(weapon.type())
+	_broadcast_fire_effects(weapon.type())
 	ammo_changed.emit(weapon.mag, weapon.reserve)
 
 	# Auto-reload as soon as the magazine runs dry.
@@ -405,6 +409,14 @@ func _fire_hitscan(weapon: Weapon) -> void:
 		# Any body exposing request_damage is damageable (players, dummies, …).
 		if collider and collider.has_method("request_damage"):
 			collider.request_damage(weapon.damage(), _peer_id())
+			_play_hitmarker(collider)
+
+## Local hit feedback: a distinct tone for hitting a teammate vs an enemy.
+func _play_hitmarker(collider: Node) -> void:
+	var teammate := false
+	if collider is PlayerController:
+		teammate = GameState._get_player_team(collider.authority_peer_id) == GameState._get_player_team(_peer_id())
+	GameAudio.play_ui("hit_teammate" if teammate else "hit_enemy", -4.0)
 
 func _fire_projectile(weapon: Weapon) -> void:
 	if _camera == null:
@@ -471,6 +483,8 @@ func _start_reload() -> void:
 	_reloading = true
 	_reload_timer = weapon.reload_time()
 	reload_started.emit(weapon.reload_time())
+	if _player:
+		GameAudio.play_at(_player.global_position, "reload", "weapon")
 
 func _complete_reload() -> void:
 	_reloading = false
@@ -518,11 +532,6 @@ func _build_effects() -> void:
 	_flash_light.omni_range = 4.0
 	_flash_light.visible = false
 	_muzzle.add_child(_flash_light)
-
-	_audio = AudioStreamPlayer3D.new()
-	_audio.stream = _build_gunshot_stream()
-	_audio.unit_size = 8.0
-	_muzzle.add_child(_audio)
 
 # === Weapon view model ===
 
@@ -638,12 +647,13 @@ func _barrel_length(weapon_type: String) -> float:
 		_:
 			return 0.28
 
-func _play_fire_effects() -> void:
+## Muzzle flash + a category-specific gunshot at the muzzle (spatial, so other
+## players hear it falling off with distance).
+func _play_fire_effects(weapon_type: String) -> void:
 	_set_flash_visible(true)
 	_flash_timer = FLASH_TIME
-	if _audio:
-		_audio.pitch_scale = randf_range(0.95, 1.05)
-		_audio.play()
+	if _muzzle:
+		GameAudio.play_at(_muzzle.global_position, "gunshot_" + weapon_type, "weapon")
 
 func _set_flash_visible(value: bool) -> void:
 	if _flash_mesh:
@@ -651,36 +661,15 @@ func _set_flash_visible(value: bool) -> void:
 	if _flash_light:
 		_flash_light.visible = value
 
-func _broadcast_fire_effects() -> void:
+func _broadcast_fire_effects(weapon_type: String) -> void:
 	if multiplayer.multiplayer_peer == null:
 		return
-	_remote_fire_effects.rpc()
+	_remote_fire_effects.rpc(weapon_type)
 
-## Cosmetic-only: replay the firing peer's muzzle flash/audio on other clients.
+## Cosmetic-only: replay the firing peer's muzzle flash/gunshot on other clients.
 @rpc("any_peer", "call_remote", "unreliable")
-func _remote_fire_effects() -> void:
-	_play_fire_effects()
-
-## Build a short procedural gunshot (noise burst + low thump) so the system has
-## audible feedback without shipping binary audio assets.
-func _build_gunshot_stream() -> AudioStreamWAV:
-	var rate := 22050
-	var sample_count := int(rate * 0.18)
-	var bytes := PackedByteArray()
-	bytes.resize(sample_count * 2)
-	for i in sample_count:
-		var t := float(i) / float(rate)
-		var envelope: float = exp(-t * 28.0)
-		var noise := randf_range(-1.0, 1.0) * envelope
-		var thump: float = sin(t * TAU * 90.0) * exp(-t * 18.0) * 0.6
-		var sample: float = clamp(noise + thump, -1.0, 1.0)
-		bytes.encode_s16(i * 2, int(sample * 32767.0))
-	var wav := AudioStreamWAV.new()
-	wav.format = AudioStreamWAV.FORMAT_16_BITS
-	wav.mix_rate = rate
-	wav.stereo = false
-	wav.data = bytes
-	return wav
+func _remote_fire_effects(weapon_type: String) -> void:
+	_play_fire_effects(weapon_type)
 
 # === HUD ===
 
