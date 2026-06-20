@@ -34,6 +34,14 @@ const HIT_FLASH_TIME: float = 0.05
 @onready var _muzzle_flash: MeshInstance3D = $Eye/MuzzleFlash
 @onready var _label: Label3D = $HealthLabel
 
+## When false, the bot stays down after dying (round-based modes reset it).
+@export var auto_respawn: bool = true
+
+# Evolution stat multipliers (1.0 = unmodified).
+var stat_health_mult: float = 1.0
+var stat_damage_mult: float = 1.0
+var stat_fire_rate_mult: float = 1.0
+
 var health: float = 0.0
 var _dead: bool = false
 var _respawn_timer: float = 0.0
@@ -73,6 +81,8 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	if _dead:
+		if not auto_respawn:
+			return
 		_respawn_timer -= delta
 		if _respawn_timer <= 0.0:
 			_reset()
@@ -96,7 +106,7 @@ func _physics_process(delta: float) -> void:
 		_face(target)
 		_fire_timer -= delta
 		if _fire_timer <= 0.0:
-			_fire_timer = FIRE_INTERVAL
+			_fire_timer = FIRE_INTERVAL * stat_fire_rate_mult
 			_shoot_at(target)
 
 	if _flash_timer > 0.0:
@@ -134,7 +144,7 @@ func _die() -> void:
 
 func _reset() -> void:
 	_dead = false
-	health = max_health
+	health = max_health * stat_health_mult
 	if _model != null:
 		_model.play_idle()
 	_collision.set_deferred("disabled", false)
@@ -145,6 +155,20 @@ func _reset() -> void:
 	_fire_timer = FIRE_INTERVAL * randf_range(0.4, 1.2)
 	_label.text = "%d" % int(health)
 	_update_color()
+
+## Apply Evolution stat multipliers and revive at full (new) health.
+func apply_stats(stats: Dictionary) -> void:
+	stat_health_mult = float(stats.get("health", 1.0))
+	stat_damage_mult = float(stats.get("damage", 1.0))
+	stat_fire_rate_mult = float(stats.get("fire_rate", 1.0))
+	_reset()
+
+## Revive for a new round (round-based modes that disable auto_respawn).
+func reset_for_round() -> void:
+	_reset()
+
+func is_alive() -> bool:
+	return not _dead
 
 ## Nearest living player (bots ignore downed/dead targets and each other).
 func _find_target() -> PlayerController:
@@ -204,7 +228,7 @@ func _shoot_at(target: PlayerController) -> void:
 		var collider = hit.get("collider")
 		# Only the player takes bot fire (walls/dummies/other bots block it).
 		if collider is PlayerController:
-			(collider as PlayerController).request_damage(SHOT_DAMAGE, authority_peer_id)
+			(collider as PlayerController).request_damage(SHOT_DAMAGE * stat_damage_mult, authority_peer_id)
 	_show_tracer(eye_pos, endpoint)
 
 ## Brief glowing line from the muzzle to the shot's endpoint, so it's obvious the

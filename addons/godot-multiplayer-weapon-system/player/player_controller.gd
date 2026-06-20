@@ -105,6 +105,12 @@ const FOOTSTEP_RUN_SPEED: float = 7.0
 const FOOTSTEP_INTERVAL: float = 0.32
 var _footstep_timer: float = 0.0
 
+# Evolution stat multipliers (1.0 = unmodified). Read by movement / weapon.
+const BASE_MAX_HEALTH: float = 100.0
+var stat_speed_mult: float = 1.0
+var stat_damage_mult: float = 1.0
+var stat_fire_rate_mult: float = 1.0
+
 func _ready() -> void:
 	health = max_health
 
@@ -181,6 +187,16 @@ func _build_body_mesh(is_local: bool) -> void:
 ## The player's character model (for the weapon controller's hand attachment).
 func character_model() -> CharacterModel:
 	return _model
+
+## Apply Evolution stat multipliers ({health, speed, damage, fire_rate}) and
+## refill to the new max. Called at the start of each round.
+func apply_stats(stats: Dictionary) -> void:
+	stat_speed_mult = stats.get("speed", 1.0)
+	stat_damage_mult = stats.get("damage", 1.0)
+	stat_fire_rate_mult = stats.get("fire_rate", 1.0)
+	max_health = BASE_MAX_HEALTH * float(stats.get("health", 1.0))
+	health = max_health
+	health_changed.emit(health, max_health)
 
 ## Colour the body relative to the local viewer's team: allies blue, enemies
 ## red. Recomputed on team swap.
@@ -319,13 +335,14 @@ func _handle_movement(delta: float) -> void:
 	var want_sprint := Input.is_action_pressed("sprint") != Settings.auto_run
 	_is_sprinting = want_sprint and input_dir.z < 0 and not _is_crouching
 
-	# Determine speed
+	# Determine speed (scaled by any Evolution speed modifier)
 	if _is_crouching:
 		_current_speed = CROUCH_SPEED
 	elif _is_sprinting:
 		_current_speed = SPRINT_SPEED
 	else:
 		_current_speed = WALK_SPEED
+	_current_speed *= stat_speed_mult
 
 	# Gravity
 	if not is_on_floor():
