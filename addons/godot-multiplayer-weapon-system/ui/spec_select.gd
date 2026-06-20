@@ -59,7 +59,7 @@ func show_choices(spec: SpecTree, header_text: String) -> void:
 	for choice in spec.selectable():
 		var path: int = choice["path"]
 		var node: Dictionary = choice["node"]
-		var capstone := spec.depths[path] == SpecTree.PATH_DEPTH - 1
+		var capstone: bool = int(spec.depths[path]) == SpecTree.PATH_DEPTH - 1
 		var button := Button.new()
 		button.custom_minimum_size = Vector2(0, 60)
 		var path_name: String = paths[path].get("name", "Path")
