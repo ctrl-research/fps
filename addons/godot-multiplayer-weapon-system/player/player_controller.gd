@@ -114,6 +114,7 @@ const BASE_MAX_HEALTH: float = 100.0
 var stat_speed_mult: float = 1.0
 var stat_damage_mult: float = 1.0
 var stat_fire_rate_mult: float = 1.0
+var stat_damage_taken_mult: float = 1.0
 
 func _ready() -> void:
 	health = max_health
@@ -201,8 +202,16 @@ func apply_stats(stats: Dictionary) -> void:
 	stat_speed_mult = stats.get("speed", 1.0)
 	stat_damage_mult = stats.get("damage", 1.0)
 	stat_fire_rate_mult = stats.get("fire_rate", 1.0)
+	stat_damage_taken_mult = stats.get("damage_taken", 1.0)
 	max_health = BASE_MAX_HEALTH * float(stats.get("health", 1.0))
 	health = max_health
+	health_changed.emit(health, max_health)
+
+## Restore health up to the current maximum (e.g. lifesteal / regen).
+func heal(amount: float) -> void:
+	if is_dead or is_downed or amount <= 0.0:
+		return
+	health = minf(health + amount, max_health)
 	health_changed.emit(health, max_health)
 
 ## Colour the body relative to the local viewer's team: allies blue, enemies
@@ -471,7 +480,7 @@ func _apply_damage(amount: float, attacker_id: int) -> void:
 	if is_dead or is_downed or amount <= 0.0:
 		return
 	_last_attacker_id = attacker_id
-	health = max(health - amount, 0.0)
+	health = max(health - amount * stat_damage_taken_mult, 0.0)
 	health_changed.emit(health, max_health)
 	_broadcast_health()
 	if health <= 0.0:
