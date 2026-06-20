@@ -53,6 +53,8 @@ func _physics_process(delta: float) -> void:
 
 func _detonate() -> void:
 	_detonated = true
+	# Spatial blast (played at the world so it survives this node freeing).
+	GameAudio.play_at(global_position, "grenade_explode", "grenade")
 	match type:
 		"flash":
 			_apply_to_players("apply_flash", duration)

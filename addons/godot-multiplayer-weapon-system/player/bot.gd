@@ -182,6 +182,7 @@ func _face(target: PlayerController) -> void:
 func _shoot_at(target: PlayerController) -> void:
 	_muzzle_flash.visible = true
 	_flash_timer = FLASH_TIME
+	GameAudio.play_at(_eye.global_position, "gunshot_assault_rifle", "weapon")
 
 	var eye_pos := _eye.global_position
 	var aim_point := target.global_position + Vector3(0.0, 1.0, 0.0)
