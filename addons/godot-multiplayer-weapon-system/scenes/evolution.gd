@@ -2,14 +2,18 @@ extends Node3D
 """
 Evolution — offline team-vs-bots round mode.
 
-Each round opens with a DRAFT: you pick a modifier (a buff for your team or a
-debuff for the enemy). Picks accumulate across the match (the "evolution") and
-are applied to you and the enemy bots at the start of every round. Clear the
-bots to win a round; get downed to lose it. First to ROUNDS_TO_WIN wins.
+Round loop:
+  POST-ROUND countdown (5s)  → VOTE (≤30s)  → PRE-ROUND countdown (5s)  → LIVE
+The first round skips the post-round countdown (nothing precedes it).
 
-Offline slice: you are team 0 (solo for now); the bots are team 1 and auto-pick
-their own modifier each round. GameState is parked (like Gun Game) so its round
-machine doesn't interfere. Full team play with ally bots + networking are later
+Each round the team votes on a modifier — a buff for itself or a debuff for the
+enemy. Votes show as ally-blue dots; the most-voted option wins (ties broken
+randomly; no votes → random). Voting ends at 30s, or shortly after everyone has
+voted. Picks accumulate across the match and reapply each round. Clear the bots
+to win a round; get downed to lose it. First to ROUNDS_TO_WIN wins.
+
+Offline slice: you are team 0 (solo for now); the bots are team 1 and auto-pick.
+GameState is parked (like Gun Game). Full team play + networking are later
 milestones (see issue #64).
 """
 
@@ -26,7 +30,14 @@ const BOT_SPAWNS: Array[Vector3] = [
 ]
 const ROUNDS_TO_WIN: int = 4
 const DRAFT_OPTIONS: int = 3
-const WINNER_BONUS_OPTION: int = 1  # round winner drafts from one extra option
+const WINNER_BONUS_OPTION: int = 1  # round winner votes from one extra option
+
+const POST_SECS: float = 5.0       # pacing buffer after a round, before voting
+const PRE_SECS: float = 5.0        # "get ready" countdown before the fight
+const VOTE_SECS: float = 30.0      # max voting time
+const VOTE_LOCKIN_SECS: float = 3.0  # grace once everyone has voted
+
+enum Phase { POST, VOTE, PRE, LIVE }
 
 var _player: PlayerController = null
 var _bots: Array = []
@@ -34,10 +45,16 @@ var _team_mods: Dictionary = {0: [], 1: []}  # team -> [modifier id, ...]
 var _scores: Dictionary = {0: 0, 1: 0}
 var _round: int = 1
 var _last_winner: int = -1
-var _resolving: bool = false
+
+var _phase: int = Phase.POST
+var _timer: float = 0.0
+var _options: Array = []
+var _votes: Dictionary = {}        # voter peer id -> option id
+var _voters: Array = [PLAYER_PEER]  # team-0 members able to vote
+var _lockin_applied: bool = false
 
 var _info_label: Label = null
-var _announce_label: Label = null
+var _countdown_label: Label = null
 var _draft: EvolutionDraft = null
 
 func _ready() -> void:
@@ -51,38 +68,140 @@ func _ready() -> void:
 	_spawn_player()
 	_build_hud()
 
-	# Esc opens the in-game menu, except while the draft overlay is up.
+	# Esc opens the in-game menu, but only during LIVE (not the draft/countdowns).
 	var pause := PauseController.new()
-	pause.is_blocked = func() -> bool: return is_instance_valid(_draft)
+	pause.is_blocked = func() -> bool: return _phase != Phase.LIVE
 	add_child(pause)
 
-	_start_draft()
+	_enter_vote()  # round 1: straight to voting (no preceding round)
 
 func _exit_tree() -> void:
 	GameState.match_over = false
 	Modifiers.clear_active()
 
-# === Round flow ===
+func _process(delta: float) -> void:
+	# Keep the cursor free through every pre-fight phase. This also defeats the
+	# web pointer-lock grant that can arrive a frame after the player spawns
+	# (the round-1 "mouse stuck" bug): we re-assert VISIBLE until the fight.
+	if _phase != Phase.LIVE and Input.get_mouse_mode() != Input.MOUSE_MODE_VISIBLE:
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 
-func _start_draft() -> void:
-	_resolving = true
-	_set_combat_active(false)  # freeze bots/player while drafting
-	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	match _phase:
+		Phase.POST:
+			_timer -= delta
+			_countdown_label.text = "Round %d won by %s\nNext round in %d" % [
+				_round - 1, _team_name(_last_winner), int(ceil(_timer))]
+			if _timer <= 0.0:
+				_enter_vote()
+		Phase.VOTE:
+			_timer -= delta
+			if not _lockin_applied and _all_voted():
+				_timer = minf(_timer, VOTE_LOCKIN_SECS)
+				_lockin_applied = true
+			if is_instance_valid(_draft):
+				_draft.set_header("Round %d — Vote  (%ds)" % [_round, int(ceil(_timer))])
+			if _timer <= 0.0:
+				_resolve_vote()
+		Phase.PRE:
+			_timer -= delta
+			_countdown_label.text = "Round %d starting in %d\nYou: %s    Enemy: %s" % [
+				_round, int(ceil(_timer)), _signed(_last_pick(0)), _signed(_last_pick(1))]
+			if _timer <= 0.0:
+				_begin_live()
+
+# === Phases ===
+
+func _enter_post() -> void:
+	_phase = Phase.POST
+	_timer = POST_SECS
+	_set_combat_active(false)
+	_countdown_label.visible = true
+
+func _enter_vote() -> void:
+	_phase = Phase.VOTE
+	_timer = VOTE_SECS
+	_lockin_applied = false
+	_votes.clear()
+	_set_combat_active(false)
+	_countdown_label.visible = false
+
 	var count := DRAFT_OPTIONS + (WINNER_BONUS_OPTION if _last_winner == 0 else 0)
+	_options = Modifiers.roll(count)
 	_draft = EvolutionDraft.new()
 	add_child(_draft)
-	_draft.picked.connect(_on_player_pick)
-	_draft.show_options(Modifiers.roll(count), "Round %d — Draft" % _round)
+	_draft.vote_changed.connect(_on_vote)
+	_draft.show_options(_options, "Round %d — Vote  (%ds)" % [_round, int(VOTE_SECS)])
+	_draft.set_votes(_tally())
 	_update_info()
 
-func _on_player_pick(modifier_id: String) -> void:
-	_team_mods[0].append(modifier_id)
-	# Enemy team auto-picks (one random modifier).
+func _enter_pre() -> void:
+	_phase = Phase.PRE
+	_timer = PRE_SECS
+	_countdown_label.visible = true
+
+func _begin_live() -> void:
+	_phase = Phase.LIVE
+	_countdown_label.visible = false
+	if is_instance_valid(_player):
+		_player.respawn(PLAYER_SPAWN)
+	for bot in _bots:
+		if is_instance_valid(bot):
+			bot.reset_for_round()
+	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+	_set_combat_active(true)
+	_update_info()
+
+# === Voting ===
+
+func _on_vote(option_id: String) -> void:
+	_votes[PLAYER_PEER] = option_id
+	if is_instance_valid(_draft):
+		_draft.set_votes(_tally())
+
+func _all_voted() -> bool:
+	for voter in _voters:
+		if not _votes.has(voter):
+			return false
+	return true
+
+## {option_id: vote count} for the current options.
+func _tally() -> Dictionary:
+	var counts := {}
+	for id in _options:
+		counts[id] = 0
+	for voter in _votes:
+		var id: String = _votes[voter]
+		counts[id] = int(counts.get(id, 0)) + 1
+	return counts
+
+## The voted-in modifier: most votes, ties broken randomly, no votes → random.
+func _winning_option() -> String:
+	if _votes.is_empty():
+		return _options[randi() % _options.size()] if not _options.is_empty() else ""
+	var counts := _tally()
+	var best := 0
+	for id in counts:
+		best = maxi(best, counts[id])
+	var top: Array = []
+	for id in counts:
+		if counts[id] == best:
+			top.append(id)
+	return top[randi() % top.size()]
+
+func _resolve_vote() -> void:
+	var pick := _winning_option()
+	if pick != "":
+		_team_mods[0].append(pick)
+	# Enemy team auto-picks one random modifier.
 	var enemy_roll := Modifiers.roll(1)
 	if not enemy_roll.is_empty():
 		_team_mods[1].append(enemy_roll[0])
+
+	if is_instance_valid(_draft):
+		_draft.queue_free()
+		_draft = null
 	_apply_all_stats()
-	_begin_live()
+	_enter_pre()
 
 func _apply_all_stats() -> void:
 	# Publish the stacks so the scoreboard (Tab) can show them.
@@ -94,53 +213,10 @@ func _apply_all_stats() -> void:
 		if is_instance_valid(bot):
 			bot.apply_stats(bot_stats)
 
-func _begin_live() -> void:
-	_resolving = false
-	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-	if is_instance_valid(_player):
-		_player.respawn(PLAYER_SPAWN)
-	for bot in _bots:
-		if is_instance_valid(bot):
-			bot.reset_for_round()
-	_set_combat_active(true)
-	_announce_evolutions()
-	_update_info()
-
-## Briefly announce what each team drafted this round.
-func _announce_evolutions() -> void:
-	if _announce_label == null:
-		return
-	var player_pick: String = _team_mods[0].back() if not _team_mods[0].is_empty() else ""
-	var enemy_pick: String = _team_mods[1].back() if not _team_mods[1].is_empty() else ""
-	_announce_label.text = "EVOLUTION   —   You: %s      Enemy: %s" % [_signed(player_pick), _signed(enemy_pick)]
-	_announce_label.visible = true
-	var tween := create_tween()
-	tween.tween_interval(3.5)
-	tween.tween_callback(func() -> void: _announce_label.visible = false)
-
-## "+Name" for a buff, "-Name" for a debuff.
-func _signed(modifier_id: String) -> String:
-	if modifier_id == "":
-		return "—"
-	var m := Modifiers.get_mod(modifier_id)
-	var prefix := "+" if m.get("kind") == "buff" else "-"
-	return "%s%s" % [prefix, m.get("name", modifier_id)]
-
-## Freeze/unfreeze the player and bots (so combat pauses during the draft).
-func _set_combat_active(active: bool) -> void:
-	if is_instance_valid(_player):
-		_player.set_physics_process(active)
-		# Also gate the player's input while drafting, so a stray click (e.g. the
-		# one that launched the scene on round 1) can't re-grab pointer lock and
-		# trap the cursor behind the draft.
-		_player.set_process_input(active)
-		_player.set_process_unhandled_input(active)
-	for bot in _bots:
-		if is_instance_valid(bot):
-			bot.set_physics_process(active)
+# === Round resolution ===
 
 func _on_bot_defeated(_by_peer_id: int) -> void:
-	if _resolving:
+	if _phase != Phase.LIVE:
 		return
 	for bot in _bots:
 		if is_instance_valid(bot) and bot.is_alive():
@@ -148,12 +224,12 @@ func _on_bot_defeated(_by_peer_id: int) -> void:
 	_end_round(0)  # all enemies down — player wins the round
 
 func _on_player_downed() -> void:
-	if _resolving:
+	if _phase != Phase.LIVE:
 		return
 	_end_round(1)  # player downed — enemy wins the round
 
 func _end_round(winner: int) -> void:
-	_resolving = true
+	_set_combat_active(false)
 	_scores[winner] += 1
 	_last_winner = winner
 	GameAudio.play_ui("round_win" if winner == 0 else "round_lose", -2.0)
@@ -161,10 +237,12 @@ func _end_round(winner: int) -> void:
 		_finish_match(winner)
 		return
 	_round += 1
-	_start_draft()
+	_enter_post()
 
 func _finish_match(winner: int) -> void:
+	_phase = Phase.POST  # not LIVE → pause stays blocked, cursor freed
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	_countdown_label.visible = false
 	var screen := MatchEndScreen.new()
 	add_child(screen)
 	var rows := [
@@ -175,12 +253,38 @@ func _finish_match(winner: int) -> void:
 		"Evolution — first to %d rounds" % ROUNDS_TO_WIN,
 		["Team", "Evolutions", "Rounds"], rows)
 
+# === Helpers ===
+
+func _last_pick(team: int) -> String:
+	return _team_mods[team].back() if not _team_mods[team].is_empty() else ""
+
+## "+Name" for a buff, "-Name" for a debuff.
+func _signed(modifier_id: String) -> String:
+	if modifier_id == "":
+		return "—"
+	var m := Modifiers.get_mod(modifier_id)
+	var prefix := "+" if m.get("kind") == "buff" else "-"
+	return "%s%s" % [prefix, m.get("name", modifier_id)]
+
+func _team_name(team: int) -> String:
+	return "You" if team == 0 else "Enemy"
+
 ## Human-readable list of a team's drafted modifiers.
 func _modifier_summary(team: int) -> String:
 	var names: Array = []
 	for id in _team_mods[team]:
 		names.append(Modifiers.get_mod(id).get("name", id))
 	return ", ".join(names) if not names.is_empty() else "—"
+
+## Freeze/unfreeze the player and bots (combat only runs during LIVE).
+func _set_combat_active(active: bool) -> void:
+	if is_instance_valid(_player):
+		_player.set_physics_process(active)
+		_player.set_process_input(active)
+		_player.set_process_unhandled_input(active)
+	for bot in _bots:
+		if is_instance_valid(bot):
+			bot.set_physics_process(active)
 
 # === Setup ===
 
@@ -190,6 +294,9 @@ func _spawn_player() -> void:
 	_player = load(PLAYER_SCENE).instantiate()
 	_player.name = "Player_%d" % PLAYER_PEER
 	_player.authority_peer_id = PLAYER_PEER
+	# The mode drives the cursor (voting/countdowns are mouse-free); don't let the
+	# player grab pointer lock on spawn (the round-1 "mouse stuck" cause).
+	_player.capture_mouse_on_ready = false
 	_player.position = PLAYER_SPAWN
 	add_child(_player)
 	_player.downed.connect(_on_player_downed)
@@ -221,17 +328,19 @@ func _build_hud() -> void:
 	_info_label.add_theme_color_override("font_color", Color(0.7, 0.9, 1.0))
 	layer.add_child(_info_label)
 
-	# Round-start announcement of each team's drafted evolution (auto-hides).
-	_announce_label = Label.new()
-	_announce_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	_announce_label.offset_top = 84.0
-	_announce_label.offset_left = -400.0
-	_announce_label.offset_right = 400.0
-	_announce_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_announce_label.add_theme_font_size_override("font_size", 26)
-	_announce_label.add_theme_color_override("font_color", Color(1.0, 0.95, 0.7))
-	_announce_label.visible = false
-	layer.add_child(_announce_label)
+	# Big centred countdown for the POST / PRE phases.
+	_countdown_label = Label.new()
+	_countdown_label.set_anchors_preset(Control.PRESET_CENTER)
+	_countdown_label.offset_left = -360.0
+	_countdown_label.offset_right = 360.0
+	_countdown_label.offset_top = -80.0
+	_countdown_label.offset_bottom = 80.0
+	_countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_countdown_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_countdown_label.add_theme_font_size_override("font_size", 34)
+	_countdown_label.add_theme_color_override("font_color", Color(1.0, 0.95, 0.7))
+	_countdown_label.visible = false
+	layer.add_child(_countdown_label)
 
 func _update_info() -> void:
 	if _info_label:
