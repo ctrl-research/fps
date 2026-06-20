@@ -11,6 +11,7 @@ Shown at startup and when disconnected. Manages connection state display.
 @onready var join_button: Button = $MenuPanel/Margin/VBox/JoinSection/JoinButton
 @onready var tutorial_button: Button = $MenuPanel/Margin/VBox/TutorialButton
 @onready var gun_game_button: Button = $MenuPanel/Margin/VBox/GunGameButton
+var _evolution_button: Button = null
 @onready var settings_button: Button = $MenuPanel/Margin/VBox/SettingsButton
 @onready var round_test_button: Button = $MenuPanel/Margin/VBox/RoundTestButton
 @onready var disconnect_button: Button = $MenuPanel/Margin/VBox/DisconnectButton
@@ -32,6 +33,13 @@ func _ready() -> void:
 	join_button.pressed.connect(_on_join_pressed)
 	tutorial_button.pressed.connect(_on_tutorial_pressed)
 	gun_game_button.pressed.connect(_on_gun_game_pressed)
+
+	# Evolution mode button (offline vs bots), inserted after Gun Game.
+	_evolution_button = Button.new()
+	_evolution_button.text = "Evolution (vs bots)"
+	gun_game_button.get_parent().add_child(_evolution_button)
+	gun_game_button.get_parent().move_child(_evolution_button, gun_game_button.get_index() + 1)
+	_evolution_button.pressed.connect(_on_evolution_pressed)
 	settings_button.pressed.connect(_on_settings_pressed)
 	round_test_button.pressed.connect(_on_round_test_pressed)
 	host_online_button.pressed.connect(_on_host_online_pressed)
@@ -88,6 +96,10 @@ func _on_tutorial_pressed() -> void:
 func _on_gun_game_pressed() -> void:
 	# Offline FFA vs bots — no networking needed.
 	get_tree().change_scene_to_file("res://addons/godot-multiplayer-weapon-system/scenes/gun_game.tscn")
+
+func _on_evolution_pressed() -> void:
+	# Offline team-vs-bots round mode with the modifier draft — no networking.
+	get_tree().change_scene_to_file("res://addons/godot-multiplayer-weapon-system/scenes/evolution.tscn")
 
 func _on_settings_pressed() -> void:
 	add_child(SettingsMenu.new())
@@ -181,6 +193,8 @@ func _on_peer_disconnected(peer_id: int) -> void:
 func _update_ui(state: int) -> void:
 	# Offline practice is only offered when not in a session.
 	tutorial_button.visible = state == MultiplayerManager.ConnectionState.DISCONNECTED
+	if _evolution_button:
+		_evolution_button.visible = state == MultiplayerManager.ConnectionState.DISCONNECTED
 	match state:
 		MultiplayerManager.ConnectionState.DISCONNECTED:
 			status_label.text = "Disconnected"

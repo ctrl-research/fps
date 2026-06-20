@@ -353,7 +353,7 @@ func _try_fire() -> void:
 		return
 
 	weapon.consume()
-	_cooldown = weapon.fire_rate()
+	_cooldown = weapon.fire_rate() * _fire_rate_mult()
 	_time_since_fire = 0.0
 
 	# Melee is a swing, not a shot: short-range hit, no muzzle flash / gunshot /
@@ -408,7 +408,7 @@ func _fire_hitscan(weapon: Weapon) -> void:
 		var collider = hit.get("collider")
 		# Any body exposing request_damage is damageable (players, dummies, …).
 		if collider and collider.has_method("request_damage"):
-			collider.request_damage(weapon.damage(), _peer_id())
+			collider.request_damage(weapon.damage() * _damage_mult(), _peer_id())
 			_play_hitmarker(collider)
 
 ## Local hit feedback: a distinct tone for hitting a teammate vs an enemy.
@@ -424,7 +424,7 @@ func _fire_projectile(weapon: Weapon) -> void:
 	var scene: PackedScene = load(PROJECTILE_SCENE)
 	var projectile: Projectile = scene.instantiate()
 	projectile.speed = weapon.projectile_speed()
-	projectile.damage = weapon.damage()
+	projectile.damage = weapon.damage() * _damage_mult()
 	projectile.attacker_id = _peer_id()
 	projectile.shooter = _player
 
@@ -697,3 +697,10 @@ func _peer_id() -> int:
 	if multiplayer.multiplayer_peer == null:
 		return 1
 	return multiplayer.get_unique_id()
+
+## Evolution stat multipliers from the owning player (1.0 if unset).
+func _damage_mult() -> float:
+	return _player.stat_damage_mult if _player else 1.0
+
+func _fire_rate_mult() -> float:
+	return _player.stat_fire_rate_mult if _player else 1.0
