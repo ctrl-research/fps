@@ -298,6 +298,36 @@ func _refresh_scoreboard() -> void:
 		_add_cell(grid, str(GameState.player_kills.get(peer_id, 0)))
 		_add_cell(grid, "$%d" % GameState.get_player_credits(peer_id))
 
+	if Modifiers.has_active():
+		_add_evolutions_section()
+
+## Evolution mode: list the local player's accumulated buffs (+) and debuffs (-).
+func _add_evolutions_section() -> void:
+	_scoreboard_vbox.add_child(HSeparator.new())
+	var header := Label.new()
+	header.text = "YOUR EVOLUTIONS"
+	header.add_theme_color_override("font_color", Color(0.7, 0.75, 0.85))
+	_scoreboard_vbox.add_child(header)
+
+	var buffs := Modifiers.local_buffs()
+	var debuffs := Modifiers.local_debuffs()
+	if buffs.is_empty() and debuffs.is_empty():
+		var none := Label.new()
+		none.text = "(none yet)"
+		_scoreboard_vbox.add_child(none)
+		return
+	for id in buffs:
+		_add_modifier_row(id, "+ ", Color(0.4, 1.0, 0.55))
+	for id in debuffs:
+		_add_modifier_row(id, "- ", Color(1.0, 0.5, 0.45))
+
+func _add_modifier_row(id: String, prefix: String, color: Color) -> void:
+	var m := Modifiers.get_mod(id)
+	var label := Label.new()
+	label.text = "%s%s  (%s)" % [prefix, m.get("name", id), m.get("desc", "")]
+	label.add_theme_color_override("font_color", color)
+	_scoreboard_vbox.add_child(label)
+
 func _add_cell(grid: GridContainer, text: String) -> void:
 	var label := Label.new()
 	label.text = text
