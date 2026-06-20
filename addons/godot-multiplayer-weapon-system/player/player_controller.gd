@@ -26,6 +26,10 @@ signal revived()
 ## Maximum health
 @export var max_health: float = 100.0
 
+## When false, the local player won't grab pointer lock on spawn (a mode that
+## owns the cursor — e.g. Evolution's voting phase — captures it later instead).
+@export var capture_mouse_on_ready: bool = true
+
 # === Movement constants ===
 const WALK_SPEED: float = 6.0
 const SPRINT_SPEED: float = 9.0
@@ -148,7 +152,10 @@ func _ready() -> void:
 	if is_local:
 		set_process_input(true)
 		set_process(true)
-		_capture_mouse()
+		# Modes that own the cursor on spawn (e.g. Evolution's voting phase) opt
+		# out, so the player doesn't grab pointer lock before they're meant to.
+		if capture_mouse_on_ready:
+			_capture_mouse()
 	else:
 		set_process_input(false)
 		set_process(false)
