@@ -22,12 +22,6 @@ const BOT_SCENE: String = "res://addons/godot-multiplayer-weapon-system/player/b
 const MAIN_SCENE: String = "res://addons/godot-multiplayer-weapon-system/scenes/main.tscn"
 
 const PLAYER_PEER: int = 1
-const PLAYER_SPAWN: Vector3 = Vector3(0.0, 1.5, 14.0)
-const BOT_SPAWNS: Array[Vector3] = [
-	Vector3(-6.0, 1.0, -12.0),
-	Vector3(6.0, 1.0, -12.0),
-	Vector3(0.0, 1.0, -15.0),
-]
 const ROUNDS_TO_WIN: int = 4
 const DRAFT_OPTIONS: int = 3
 const WINNER_BONUS_OPTION: int = 1  # round winner votes from one extra option
@@ -41,6 +35,8 @@ enum Phase { POST, VOTE, PRE, LIVE }
 
 var _player: PlayerController = null
 var _bots: Array = []
+var _player_spawn: Vector3 = Vector3(0.0, 1.5, 40.0)
+var _bot_spawns: Array = []
 var _team_mods: Dictionary = {0: [], 1: []}  # team -> [modifier id, ...]
 var _scores: Dictionary = {0: 0, 1: 0}
 var _round: int = 1
@@ -63,7 +59,11 @@ func _ready() -> void:
 	GameState.current_round_state = GameState.RoundState.LIVE
 
 	_build_environment()
-	_build_arena()
+	# Shared symmetric battle map; pull team spawns from it.
+	var arena := Arena.new()
+	add_child(arena)
+	_player_spawn = arena.team_spawns(0)[0]
+	_bot_spawns = arena.team_spawns(1)
 	_spawn_bots()
 	_spawn_player()
 	_build_hud()
@@ -143,7 +143,7 @@ func _begin_live() -> void:
 	_phase = Phase.LIVE
 	_countdown_label.visible = false
 	if is_instance_valid(_player):
-		_player.respawn(PLAYER_SPAWN)
+		_player.respawn(_player_spawn)
 	for bot in _bots:
 		if is_instance_valid(bot):
 			bot.reset_for_round()
@@ -297,22 +297,20 @@ func _spawn_player() -> void:
 	# The mode drives the cursor (voting/countdowns are mouse-free); don't let the
 	# player grab pointer lock on spawn (the round-1 "mouse stuck" cause).
 	_player.capture_mouse_on_ready = false
-	_player.position = PLAYER_SPAWN
+	_player.position = _player_spawn
 	add_child(_player)
 	_player.downed.connect(_on_player_downed)
 
 func _spawn_bots() -> void:
 	var scene: PackedScene = load(BOT_SCENE)
-	var index := 0
-	for pos in BOT_SPAWNS:
+	for index in _bot_spawns.size():
 		var bot: Bot = scene.instantiate()
 		bot.authority_peer_id = 1001 + index * 2
 		bot.auto_respawn = false
-		bot.position = pos
+		bot.position = _bot_spawns[index]
 		add_child(bot)
 		bot.defeated.connect(_on_bot_defeated)
 		_bots.append(bot)
-		index += 1
 
 func _build_hud() -> void:
 	var layer := CanvasLayer.new()
@@ -362,30 +360,3 @@ func _build_environment() -> void:
 	sun.rotation_degrees = Vector3(-50.0, -30.0, 0.0)
 	sun.light_energy = 1.1
 	add_child(sun)
-
-func _build_arena() -> void:
-	_add_static_box(Vector3(0.0, -0.5, 0.0), Vector3(48.0, 1.0, 60.0), Color(0.2, 0.22, 0.26))
-	var cover := Color(0.3, 0.27, 0.24)
-	_add_static_box(Vector3(-5.0, 1.0, 0.0), Vector3(2.0, 2.0, 2.0), cover)
-	_add_static_box(Vector3(5.0, 1.0, 0.0), Vector3(2.0, 2.0, 2.0), cover)
-	_add_static_box(Vector3(0.0, 1.0, -4.0), Vector3(4.0, 2.0, 1.0), cover)
-	_add_static_box(Vector3(-9.0, 1.25, 4.0), Vector3(1.0, 2.5, 5.0), cover)
-	_add_static_box(Vector3(9.0, 1.25, 4.0), Vector3(1.0, 2.5, 5.0), cover)
-
-func _add_static_box(pos: Vector3, box_size: Vector3, color: Color) -> void:
-	var body := StaticBody3D.new()
-	body.position = pos
-	var shape := CollisionShape3D.new()
-	var collision_box := BoxShape3D.new()
-	collision_box.size = box_size
-	shape.shape = collision_box
-	body.add_child(shape)
-	var mesh := MeshInstance3D.new()
-	var box_mesh := BoxMesh.new()
-	box_mesh.size = box_size
-	mesh.mesh = box_mesh
-	var material := StandardMaterial3D.new()
-	material.albedo_color = CategoryColors.to_map_grey(color)
-	mesh.material_override = material
-	body.add_child(mesh)
-	add_child(body)
