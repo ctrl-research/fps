@@ -23,7 +23,7 @@ func _init(class_id_: String) -> void:
 	class_id = class_id_
 
 func class_def() -> Dictionary:
-	return ClassDatabase.get_class(class_id)
+	return ClassDatabase.get_def(class_id)
 
 func points_spent() -> int:
 	return depths[0] + depths[1]

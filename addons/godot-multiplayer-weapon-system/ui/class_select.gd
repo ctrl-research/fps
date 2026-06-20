@@ -41,7 +41,7 @@ func show_classes() -> void:
 	vbox.add_child(HSeparator.new())
 
 	for id in ClassDatabase.class_ids():
-		var def := ClassDatabase.get_class(id)
+		var def := ClassDatabase.get_def(id)
 		var paths: Array = def.get("paths", [])
 		var path_names: Array = []
 		for p in paths:

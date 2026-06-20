@@ -223,7 +223,7 @@ func _build_summary() -> String:
 	var parts: Array = []
 	for p in paths.size():
 		parts.append("%s %d" % [paths[p].get("name", "Path"), _spec.depths[p]])
-	return ClassDatabase.get_class(_class_id).get("name", _class_id) + ": " + " / ".join(parts)
+	return ClassDatabase.get_def(_class_id).get("name", _class_id) + ": " + " / ".join(parts)
 
 func _team_name(team: int) -> String:
 	return "You" if team == 0 else "Enemy"

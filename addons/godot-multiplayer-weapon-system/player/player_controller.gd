@@ -193,7 +193,7 @@ func _build_body_mesh(is_local: bool) -> void:
 
 ## The model for the player's class (falls back to the default if unknown).
 func _class_model() -> String:
-	return ClassDatabase.get_class(class_id).get("model", PLAYER_MODEL)
+	return ClassDatabase.get_def(class_id).get("model", PLAYER_MODEL)
 
 ## The player's character model.
 func character_model() -> CharacterModel:

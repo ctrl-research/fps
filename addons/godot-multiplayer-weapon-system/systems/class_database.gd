@@ -13,13 +13,13 @@ linear ladder of 8 nodes. A node carries any of:
 Stat keys (multipliers, 1.0 = unchanged): health, speed, damage, fire_rate
 (attack interval — <1 is faster), damage_taken (<1 is damage reduction).
 
-Pure data + static lookups (no autoload). Access via ClassDatabase.get_class(id).
+Pure data + static lookups (no autoload). Access via ClassDatabase.get_def(id).
 """
 
 ## Points a player can spend over a match (tree depth beyond the free root).
 const MAX_POINTS: int = 8
 
-static func get_class(id: String) -> Dictionary:
+static func get_def(id: String) -> Dictionary:
 	return _classes().get(id, {})
 
 static func class_ids() -> Array:
