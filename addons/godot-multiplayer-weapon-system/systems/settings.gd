@@ -50,6 +50,8 @@ const ACTION_LABELS: Dictionary = {
 var mouse_sensitivity: float = DEFAULT_MOUSE_SENSITIVITY
 ## When true, the minimap rotates with the player's view (border stays fixed).
 var minimap_rotates: bool = true
+## When true, the player sprints by default and the sprint key walks instead.
+var auto_run: bool = false
 ## Master output volume, 0..1 (applied to the Master audio bus).
 var master_volume: float = DEFAULT_MASTER_VOLUME
 ## Index into CROSSHAIR_STYLES.
@@ -99,6 +101,11 @@ func set_mouse_sensitivity(value: float) -> void:
 
 func set_minimap_rotates(value: bool) -> void:
 	minimap_rotates = value
+	save()
+	settings_changed.emit()
+
+func set_auto_run(value: bool) -> void:
+	auto_run = value
 	save()
 	settings_changed.emit()
 
@@ -160,6 +167,7 @@ func save() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("input", "mouse_sensitivity", mouse_sensitivity)
 	cfg.set_value("options", "minimap_rotates", minimap_rotates)
+	cfg.set_value("options", "auto_run", auto_run)
 	cfg.set_value("audio", "master_volume", master_volume)
 	cfg.set_value("options", "crosshair_style", crosshair_style)
 	cfg.set_value("options", "stylize_enabled", stylize_enabled)
@@ -185,6 +193,7 @@ func _load() -> void:
 		return
 	mouse_sensitivity = cfg.get_value("input", "mouse_sensitivity", DEFAULT_MOUSE_SENSITIVITY)
 	minimap_rotates = cfg.get_value("options", "minimap_rotates", true)
+	auto_run = cfg.get_value("options", "auto_run", false)
 	master_volume = cfg.get_value("audio", "master_volume", DEFAULT_MASTER_VOLUME)
 	crosshair_style = cfg.get_value("options", "crosshair_style", 0)
 	stylize_enabled = cfg.get_value("options", "stylize_enabled", true)
