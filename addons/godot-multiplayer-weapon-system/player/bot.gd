@@ -20,8 +20,6 @@ const GRAVITY: float = 20.0
 const RESPAWN_DELAY: float = 5.0
 const FIRE_INTERVAL: float = 1.8
 const SHOT_DAMAGE: float = 6.0
-## Only engage players within this distance and with a clear line of sight.
-const ENGAGE_RANGE: float = 16.0
 const FIRE_RANGE: float = 70.0
 const AIM_SPREAD: float = 0.06
 const FLASH_TIME: float = 0.06
@@ -170,10 +168,11 @@ func reset_for_round() -> void:
 func is_alive() -> bool:
 	return not _dead
 
-## Nearest living player (bots ignore downed/dead targets and each other).
+## Nearest living player with a clear line of sight, at any range (bots ignore
+## downed/dead targets and each other).
 func _find_target() -> PlayerController:
 	var best: PlayerController = null
-	var best_dist := ENGAGE_RANGE
+	var best_dist := INF
 	for node in get_tree().get_nodes_in_group("players"):
 		if not (node is PlayerController) or not is_instance_valid(node):
 			continue

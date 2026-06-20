@@ -129,6 +129,11 @@ func _signed(modifier_id: String) -> String:
 func _set_combat_active(active: bool) -> void:
 	if is_instance_valid(_player):
 		_player.set_physics_process(active)
+		# Also gate the player's input while drafting, so a stray click (e.g. the
+		# one that launched the scene on round 1) can't re-grab pointer lock and
+		# trap the cursor behind the draft.
+		_player.set_process_input(active)
+		_player.set_process_unhandled_input(active)
 	for bot in _bots:
 		if is_instance_valid(bot):
 			bot.set_physics_process(active)
