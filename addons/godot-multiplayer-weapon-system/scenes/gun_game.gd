@@ -21,13 +21,11 @@ const LADDER: Array[String] = [
 ]
 
 const PLAYER_PEER: int = 1
-const PLAYER_SPAWN: Vector3 = Vector3(0.0, 1.5, 12.0)
-const BOT_SPAWNS: Array[Vector3] = [
-	Vector3(-9.0, 1.0, -3.0),
-	Vector3(9.0, 1.0, -3.0),
-	Vector3(0.0, 1.0, -13.0),
-]
 const RESPAWN_DELAY: float = 2.0
+
+# Spawns pulled from the shared Arena (FFA: player + bots spread across both ends).
+var _player_spawn: Vector3 = Vector3(0.0, 1.5, 40.0)
+var _bot_spawns: Array = []
 
 var _player: PlayerController = null
 var _player_level: int = 0
@@ -43,7 +41,12 @@ func _ready() -> void:
 	GameState.current_round_state = GameState.RoundState.LIVE
 
 	_build_environment()
-	_build_arena()
+	# Shared battle map. FFA: player at one end, bots at the far end + spares.
+	var arena := Arena.new()
+	add_child(arena)
+	var spawns := arena.all_spawns()
+	_player_spawn = spawns[0]
+	_bot_spawns = spawns.slice(1)
 	_spawn_bots()
 	_spawn_player()
 	_build_hud()
@@ -73,48 +76,19 @@ func _build_environment() -> void:
 	sun.light_energy = 1.1
 	add_child(sun)
 
-func _build_arena() -> void:
-	_add_static_box(Vector3(0.0, -0.5, 0.0), Vector3(44.0, 1.0, 44.0), Color(0.2, 0.22, 0.26))
-	var cover := Color(0.3, 0.27, 0.24)
-	# A few cover blocks to fight around.
-	_add_static_box(Vector3(-5.0, 1.0, 2.0), Vector3(2.0, 2.0, 2.0), cover)
-	_add_static_box(Vector3(5.0, 1.0, 2.0), Vector3(2.0, 2.0, 2.0), cover)
-	_add_static_box(Vector3(0.0, 1.0, -6.0), Vector3(4.0, 2.0, 1.0), cover)
-	_add_static_box(Vector3(-10.0, 1.25, -9.0), Vector3(1.0, 2.5, 5.0), cover)
-	_add_static_box(Vector3(10.0, 1.25, -9.0), Vector3(1.0, 2.5, 5.0), cover)
-
-func _add_static_box(pos: Vector3, box_size: Vector3, color: Color) -> void:
-	var body := StaticBody3D.new()
-	body.position = pos
-	var shape := CollisionShape3D.new()
-	var collision_box := BoxShape3D.new()
-	collision_box.size = box_size
-	shape.shape = collision_box
-	body.add_child(shape)
-	var mesh := MeshInstance3D.new()
-	var box_mesh := BoxMesh.new()
-	box_mesh.size = box_size
-	mesh.mesh = box_mesh
-	var material := StandardMaterial3D.new()
-	# Map geometry reads as grey (keeps light/dark contrast) for category clarity.
-	material.albedo_color = CategoryColors.to_map_grey(color)
-	mesh.material_override = material
-	body.add_child(mesh)
-	add_child(body)
+const BOT_COUNT: int = 3
 
 func _spawn_bots() -> void:
 	var scene: PackedScene = load(BOT_SCENE)
-	var index := 0
-	for pos in BOT_SPAWNS:
+	for index in mini(BOT_COUNT, _bot_spawns.size()):
 		var bot: Bot = scene.instantiate()
 		var peer_id := 1001 + index * 2
 		bot.authority_peer_id = peer_id
-		bot.position = pos
+		bot.position = _bot_spawns[index]
 		add_child(bot)
 		bot.defeated.connect(_on_bot_defeated.bind(peer_id))
 		_bots[peer_id] = bot
 		_bot_levels[peer_id] = 0
-		index += 1
 
 func _spawn_player() -> void:
 	PlayerLoadout.primary_weapon = LADDER[0]
@@ -122,7 +96,7 @@ func _spawn_player() -> void:
 	_player = load(PLAYER_SCENE).instantiate()
 	_player.name = "Player_%d" % PLAYER_PEER
 	_player.authority_peer_id = PLAYER_PEER
-	_player.position = PLAYER_SPAWN
+	_player.position = _player_spawn
 	add_child(_player)
 	_player.downed.connect(_on_player_downed)
 
@@ -140,7 +114,7 @@ func _on_player_downed() -> void:
 	# Quick respawn (keeps the player's level).
 	await get_tree().create_timer(RESPAWN_DELAY).timeout
 	if is_instance_valid(_player) and not _over:
-		_player.respawn(PLAYER_SPAWN)
+		_player.respawn(_player_spawn)
 
 func _player_scored() -> void:
 	if _over:
