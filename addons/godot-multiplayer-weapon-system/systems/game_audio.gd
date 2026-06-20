@@ -158,8 +158,8 @@ func _reload() -> AudioStreamWAV:
 	for i in n:
 		var t := float(i) / RATE
 		var click := 0.0
-		for onset in [0.0, 0.28]:
-			var lt := t - onset
+		for onset: float in [0.0, 0.28]:
+			var lt: float = t - onset
 			if lt >= 0.0:
 				click += randf_range(-1.0, 1.0) * exp(-lt * 90.0) * 0.8
 		s[i] = clampf(click, -1.0, 1.0)
@@ -235,8 +235,8 @@ func _heartbeat_loop() -> AudioStreamWAV:
 	for i in n:
 		var t := float(i) / RATE
 		var beat := 0.0
-		for onset in [0.0, 0.22]:
-			var lt := t - onset
+		for onset: float in [0.0, 0.22]:
+			var lt: float = t - onset
 			if lt >= 0.0:
 				beat += sin(lt * TAU * 50.0) * exp(-lt * 24.0)
 		s[i] = clampf(beat * 0.8, -1.0, 1.0)
