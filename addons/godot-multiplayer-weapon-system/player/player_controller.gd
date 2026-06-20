@@ -98,7 +98,10 @@ var bleedout_timer: float = 0.0
 var emp_timer: float = 0.0
 var _knockback: Vector3 = Vector3.ZERO
 var _last_attacker_id: int = 0
-var _weapon_controller: WeaponController = null
+var _ability_controller: AbilityController = null
+## The player's class id (set before add_child); drives model + ability kit.
+var class_id: String = "warrior"
+var _spec_tree: SpecTree = null
 var _model: CharacterModel = null
 # Previous position, for deriving planar speed to pick the locomotion animation.
 var _prev_anim_pos: Vector3 = Vector3.ZERO
@@ -128,14 +131,16 @@ func _ready() -> void:
 	var is_local := is_multiplayer_authority()
 	_camera.current = is_local
 
-	# Weapon handling exists on every body: the local one reads input, remote
-	# ones replay fire effects received over RPC.
-	_weapon_controller = WeaponController.new()
-	_weapon_controller.name = "WeaponController"
-	add_child(_weapon_controller)
-	_weapon_controller.setup(self, _camera, is_local)
+	# Class-arena combat: a melee base attack + cooldown abilities driven by the
+	# player's class/spec (replaces the gun controller).
+	_ability_controller = AbilityController.new()
+	_ability_controller.name = "AbilityController"
+	add_child(_ability_controller)
+	_ability_controller.setup(self, _camera, is_local)
 
 	_build_body_mesh(is_local)
+	if _spec_tree != null:
+		apply_spec(_spec_tree)
 
 	# Joined so the minimap and other systems can enumerate all player bodies.
 	add_to_group("players")
@@ -174,7 +179,7 @@ func _build_body_mesh(is_local: bool) -> void:
 
 	_model = CharacterModel.new()
 	body.add_child(_model)
-	_model.setup(PLAYER_MODEL)
+	_model.setup(_class_model())
 
 	if is_local:
 		# Own body on its own visual layer, culled from the first-person camera.
@@ -184,17 +189,22 @@ func _build_body_mesh(is_local: bool) -> void:
 	# Comic outline + posterise is a global post-process; the body's base colour
 	# encodes team (blue ally / red enemy) for readability.
 	_apply_team_tint()
-
-	# Put the held weapon in the model's hand (for mirrors / other players); the
-	# local first-person viewmodel is separate and camera-mounted.
-	if _weapon_controller:
-		_weapon_controller.attach_world_weapon()
-
 	_prev_anim_pos = global_position
 
-## The player's character model (for the weapon controller's hand attachment).
+## The model for the player's class (falls back to the default if unknown).
+func _class_model() -> String:
+	return ClassDatabase.get_class(class_id).get("model", PLAYER_MODEL)
+
+## The player's character model.
 func character_model() -> CharacterModel:
 	return _model
+
+## Apply a spec allocation: stat multipliers + the ability kit it grants.
+func apply_spec(spec: SpecTree) -> void:
+	_spec_tree = spec
+	apply_stats(spec.aggregate_stats())
+	if _ability_controller:
+		_ability_controller.configure(spec.granted_abilities(), spec.tags())
 
 ## Apply Evolution stat multipliers ({health, speed, damage, fire_rate}) and
 ## refill to the new max. Called at the start of each round.
