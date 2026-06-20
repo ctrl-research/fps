@@ -314,8 +314,10 @@ func _handle_movement(delta: float) -> void:
 	# Crouch
 	_update_crouch(delta, input_dir)
 
-	# Sprint
-	_is_sprinting = Input.is_action_pressed("sprint") and input_dir.z < 0 and not _is_crouching
+	# Sprint. With auto-run on, sprinting is the default and the sprint key walks;
+	# otherwise the key sprints. (XOR the key against the auto-run setting.)
+	var want_sprint := Input.is_action_pressed("sprint") != Settings.auto_run
+	_is_sprinting = want_sprint and input_dir.z < 0 and not _is_crouching
 
 	# Determine speed
 	if _is_crouching:

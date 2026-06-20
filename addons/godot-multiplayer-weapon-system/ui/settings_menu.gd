@@ -84,6 +84,19 @@ func _build_ui() -> void:
 	minimap_check.toggled.connect(Settings.set_minimap_rotates)
 	minimap_row.add_child(minimap_check)
 
+	# Auto-run toggle (sprint by default; sprint key walks).
+	var autorun_row := HBoxContainer.new()
+	autorun_row.add_theme_constant_override("separation", 12)
+	vbox.add_child(autorun_row)
+	var autorun_label := Label.new()
+	autorun_label.text = "Auto-run (sprint by default)"
+	autorun_label.custom_minimum_size = Vector2(200, 0)
+	autorun_row.add_child(autorun_label)
+	var autorun_check := CheckButton.new()
+	autorun_check.button_pressed = Settings.auto_run
+	autorun_check.toggled.connect(Settings.set_auto_run)
+	autorun_row.add_child(autorun_check)
+
 	# Comic stylise shader: master toggle, colour mode, edge outline.
 	var stylize_row := HBoxContainer.new()
 	stylize_row.add_theme_constant_override("separation", 12)
