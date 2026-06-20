@@ -49,13 +49,11 @@ func _ready() -> void:
 	_build_hud()
 	_update_level_label()
 
+	# Esc opens the in-game menu (Resume / Settings / Leave).
+	add_child(PauseController.new())
+
 func _exit_tree() -> void:
 	GameState.match_over = false
-
-func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("disconnect_network"):
-		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-		get_tree().change_scene_to_file(MAIN_SCENE)
 
 # === Setup ===
 

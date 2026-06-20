@@ -6,10 +6,19 @@ Instantiated when the host starts a round.
 
 @onready var player_spawner: Node = $PlayerSpawner
 
+const MAIN_SCENE: String = "res://addons/godot-multiplayer-weapon-system/scenes/main.tscn"
+
 func _ready() -> void:
 	# Ensure environment is set up
 	_setup_environment()
 	GameState.match_ended.connect(_on_match_ended)
+
+	# Esc opens the in-game menu; "Leave" disconnects the session first.
+	var pause := PauseController.new()
+	pause.leave_action = func() -> void:
+		MultiplayerManager.disconnect_session()
+		get_tree().change_scene_to_file(MAIN_SCENE)
+	add_child(pause)
 
 func _on_match_ended(_winning_team: int) -> void:
 	# Show the results overlay for whichever team the local player is on.

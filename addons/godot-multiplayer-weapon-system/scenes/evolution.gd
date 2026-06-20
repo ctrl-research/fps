@@ -50,16 +50,17 @@ func _ready() -> void:
 	_spawn_bots()
 	_spawn_player()
 	_build_hud()
+
+	# Esc opens the in-game menu, except while the draft overlay is up.
+	var pause := PauseController.new()
+	pause.is_blocked = func() -> bool: return is_instance_valid(_draft)
+	add_child(pause)
+
 	_start_draft()
 
 func _exit_tree() -> void:
 	GameState.match_over = false
 	Modifiers.clear_active()
-
-func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("disconnect_network") and not is_instance_valid(_draft):
-		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-		get_tree().change_scene_to_file(MAIN_SCENE)
 
 # === Round flow ===
 
