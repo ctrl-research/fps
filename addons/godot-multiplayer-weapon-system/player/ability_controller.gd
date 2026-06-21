@@ -338,8 +338,8 @@ func _build_viewmodel() -> void:
 	_sword_rest = _sword.transform
 
 func _build_sword() -> void:
-	# Held two-handed, centred-low, blade up and angled across the view.
-	_sword.position = Vector3(0.12, -0.32, -0.55)
+	# Held in the lower-right, blade up and angled across the view.
+	_sword.position = Vector3(0.32, -0.42, -0.55)
 	_sword.rotation = Vector3(deg_to_rad(-62.0), deg_to_rad(8.0), deg_to_rad(10.0))
 	var steel := Color(0.74, 0.77, 0.82)
 	var dark := Color(0.13, 0.12, 0.14)
@@ -352,8 +352,8 @@ func _build_sword() -> void:
 	_add_part(Vector3(0.07, 0.08, 0.07), Vector3(0.0, -0.08, 0.02), skin)
 
 func _build_palm() -> void:
-	# Right hand held palm-up, lower-right, with a fireball hovering above it.
-	_sword.position = Vector3(0.34, -0.34, -0.6)
+	# Right hand held palm-up in the lower-right, with a fireball hovering above.
+	_sword.position = Vector3(0.46, -0.44, -0.6)
 	_sword.rotation = Vector3(deg_to_rad(-8.0), deg_to_rad(-10.0), deg_to_rad(0.0))
 	var skin := Color(0.85, 0.68, 0.55)
 	_add_part(Vector3(0.14, 0.035, 0.16), Vector3(0.0, 0.0, 0.0), skin)          # palm
