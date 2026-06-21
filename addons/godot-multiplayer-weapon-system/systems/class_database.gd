@@ -25,6 +25,15 @@ static func get_def(id: String) -> Dictionary:
 static func class_ids() -> Array:
 	return _classes().keys()
 
+## The icon of the node that grants `ability_id` (for HUD display); "" if none.
+static func ability_icon(ability_id: String) -> String:
+	for cid in _classes():
+		for path in _classes()[cid].get("paths", []):
+			for node in path.get("nodes", []):
+				if ability_id in node.get("grants", []):
+					return node.get("icon", "")
+	return ""
+
 static func _classes() -> Dictionary:
 	return {"warrior": _warrior(), "mage": _mage(), "archer": _archer()}
 

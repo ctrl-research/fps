@@ -35,6 +35,7 @@ var _buy_hint: Label = null
 var _minimap: Control = null
 var _status_label: Label = null
 var _crosshair: Control = null
+var _ability_bar: Control = null
 
 # Hold-Tab scoreboard overlay.
 var _scoreboard_root: Control = null
@@ -67,6 +68,8 @@ func bind(player: PlayerController) -> void:
 func _process(_delta: float) -> void:
 	if _minimap:
 		_minimap.queue_redraw()
+	if _ability_bar:
+		_ability_bar.queue_redraw()
 	if _player and _player.is_downed:
 		_status_label.text = "DOWNED — %ds" % int(ceil(maxf(_player.bleedout_timer, 0.0)))
 	_update_scoreboard()
@@ -145,6 +148,13 @@ func _build_ui() -> void:
 	add_child(_crosshair)
 	_set_rect(_crosshair, 0.5, 0.5, 0.5, 0.5, -32.0, -32.0, 32.0, 32.0)
 
+	# Ability cooldown bar, bottom-centre.
+	_ability_bar = Control.new()
+	_ability_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ability_bar.draw.connect(_draw_ability_bar)
+	add_child(_ability_bar)
+	_set_rect(_ability_bar, 0.5, 1.0, 0.5, 1.0, -220.0, -88.0, 220.0, -20.0)
+
 	# Center: downed / eliminated status.
 	_status_label = Label.new()
 	_status_label.add_theme_font_size_override("font_size", 40)
@@ -166,6 +176,45 @@ func _set_rect(c: Control, al: float, at: float, ar: float, ab: float,
 	c.offset_top = ot
 	c.offset_right = orr
 	c.offset_bottom = ob
+
+# === Ability cooldown bar ===
+
+## Draw a box per cooldown ability with its icon, keybind, and cooldown sweep.
+func _draw_ability_bar() -> void:
+	if not is_instance_valid(_player):
+		return
+	var ctrl: AbilityController = _player.ability_controller()
+	if ctrl == null:
+		return
+	var slots := ctrl.cooldown_slots()
+	if slots.is_empty():
+		return
+	var font := ThemeDB.fallback_font
+	var box := 52.0
+	var gap := 10.0
+	var total := slots.size() * box + (slots.size() - 1) * gap
+	var size := _ability_bar.size
+	var y := (size.y - box) * 0.5
+	var x0 := (size.x - total) * 0.5
+	for i in slots.size():
+		var s: Dictionary = slots[i]
+		var x := x0 + i * (box + gap)
+		var rect := Rect2(x, y, box, box)
+		var rem := float(s["remaining"])
+		_ability_bar.draw_rect(rect, Color(0.1, 0.12, 0.16, 0.7))
+		_ability_bar.draw_string(font, Vector2(x, y + box * 0.6), str(s["icon"]),
+			HORIZONTAL_ALIGNMENT_CENTER, box, 18, Color.WHITE)
+		_ability_bar.draw_string(font, Vector2(x + 4, y + 14), str(s["key"]),
+			HORIZONTAL_ALIGNMENT_LEFT, box - 8, 11, Color(0.75, 0.8, 0.95))
+		var cd := float(s["cooldown"])
+		if rem > 0.0 and cd > 0.0:
+			# Dark sweep that shrinks from the top as the cooldown elapses.
+			var frac := clampf(rem / cd, 0.0, 1.0)
+			_ability_bar.draw_rect(Rect2(x, y, box, box * frac), Color(0, 0, 0, 0.6))
+			_ability_bar.draw_string(font, Vector2(x, y + box * 0.62), "%d" % int(ceil(rem)),
+				HORIZONTAL_ALIGNMENT_CENTER, box, 20, Color(1.0, 0.9, 0.6))
+		var border := Color(0.5, 0.6, 0.7, 0.6) if rem > 0.0 else Color(0.6, 0.85, 1.0, 0.8)
+		_ability_bar.draw_rect(rect, border, false, 2.0)
 
 # === Crosshair ===
 

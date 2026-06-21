@@ -208,6 +208,10 @@ func _class_model() -> String:
 func character_model() -> CharacterModel:
 	return _model
 
+## The player's ability controller (for the HUD cooldown bar).
+func ability_controller() -> AbilityController:
+	return _ability_controller
+
 ## Apply a spec allocation: stat multipliers + the ability kit it grants.
 func apply_spec(spec: SpecTree) -> void:
 	_spec_tree = spec

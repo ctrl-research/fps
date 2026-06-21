@@ -136,6 +136,29 @@ func _try_cast(id: String, def: Dictionary) -> void:
 	ability_state_changed.emit(def.get("slot", ""), id, cd, cd)
 	_cast(id)
 
+## Short icons for base-kit abilities (granted ones get their node's icon).
+const BASE_ICONS: Dictionary = {"dash": "DASH", "blink": "BLINK"}
+## Slots shown on the cooldown HUD (the primary attack has no cooldown).
+const COOLDOWN_SLOTS: Array[String] = ["dash", "ability1", "ult"]
+
+## Cooldown HUD data: one entry per cooldown ability the player has.
+func cooldown_slots() -> Array:
+	var out: Array = []
+	for id in _abilities:
+		var def: Dictionary = ABILITY_DEFS.get(id, {})
+		var slot: String = def.get("slot", "")
+		if not COOLDOWN_SLOTS.has(slot):
+			continue
+		var icon: String = BASE_ICONS.get(id, ClassDatabase.ability_icon(id))
+		out.append({
+			"id": id,
+			"icon": icon,
+			"key": Settings.binding_label(SLOT_ACTION.get(slot, "")),
+			"cooldown": float(def.get("cooldown", 0.0)),
+			"remaining": float(_cooldowns.get(id, 0.0)),
+		})
+	return out
+
 ## Reduce all ability cooldowns (Rampage tag: kills cut cooldowns).
 func reduce_cooldowns(seconds: float) -> void:
 	for id in _cooldowns:
