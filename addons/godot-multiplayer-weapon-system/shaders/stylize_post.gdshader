@@ -32,7 +32,7 @@ uniform vec3 sky_sentinel : source_color = vec3(1.0, 0.0, 1.0);
 uniform vec3 sky_sun_dir = vec3(0.0, -1.0, 0.0);  // light travel direction
 uniform float sky_day = 1.0;       // 1 = day, 0 = night
 uniform float sky_sunset = 0.0;    // peaks at sunset
-uniform mat3 cam_basis = mat3(1.0);
+uniform mat3 cam_basis;
 uniform float cam_tan = 0.5;       // tan(vertical_fov / 2)
 uniform float cam_aspect = 1.78;
 

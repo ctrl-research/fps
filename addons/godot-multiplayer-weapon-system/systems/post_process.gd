@@ -26,6 +26,10 @@ func _ready() -> void:
 
 	_rect = ColorRect.new()
 	_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# Fail-safe: a ColorRect's base colour is what shows if the shader ever fails
+	# to compile. Default white would paint the whole screen white; transparent
+	# means a broken shader just shows the raw (un-stylised) frame instead.
+	_rect.color = Color(0.0, 0.0, 0.0, 0.0)
 	# Never intercept clicks.
 	_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_material = ShaderMaterial.new()
