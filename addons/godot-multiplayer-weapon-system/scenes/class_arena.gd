@@ -44,6 +44,7 @@ var _phase: int = Phase.SELECT
 var _timer: float = 0.0
 var _info_label: Label = null
 var _countdown_label: Label = null
+var _sky: DayNightSky = null
 var _overlay: CanvasLayer = null
 
 func _ready() -> void:
@@ -163,6 +164,7 @@ func _begin_live() -> void:
 			bot.reset_for_round()
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 	_set_combat_active(true)
+	_update_day_night()
 	_update_info()
 
 func _apply_spec() -> void:
@@ -291,17 +293,12 @@ func _update_info() -> void:
 			_round, _scores[0], _scores[1], ROUNDS_TO_WIN, _build_summary()]
 
 func _build_environment() -> void:
-	var env := Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.12, 0.13, 0.18)
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.4, 0.4, 0.45)
-	env.ambient_light_energy = 1.0
-	var world_env := WorldEnvironment.new()
-	world_env.environment = env
-	add_child(world_env)
+	# Procedural sky + sun with a day→sunset→night cycle across the match.
+	_sky = DayNightSky.new()
+	add_child(_sky)
 
-	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-50.0, -30.0, 0.0)
-	sun.light_energy = 1.1
-	add_child(sun)
+## Advance the time of day: sunset lands at the match midpoint (round
+## ROUNDS_TO_WIN), darkening toward night as the match runs long.
+func _update_day_night() -> void:
+	if _sky:
+		_sky.apply(clampf(float(_round - 1) / float(2 * ROUNDS_TO_WIN - 2), 0.0, 1.0))
