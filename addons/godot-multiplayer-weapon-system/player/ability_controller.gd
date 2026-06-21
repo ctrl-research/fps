@@ -112,7 +112,12 @@ func _handle_input() -> void:
 	for id in _abilities:
 		var def: Dictionary = ABILITY_DEFS.get(id, {})
 		var action: String = SLOT_ACTION.get(def.get("slot", ""), "")
-		if action == "" or not Input.is_action_just_pressed(action):
+		if action == "":
+			continue
+		# The primary attack fires continuously while held (gated by the attack
+		# interval); other abilities trigger on the initial press only.
+		var triggered := Input.is_action_pressed(action) if def.get("slot", "") == "attack" else Input.is_action_just_pressed(action)
+		if not triggered:
 			continue
 		_try_cast(id, def)
 
