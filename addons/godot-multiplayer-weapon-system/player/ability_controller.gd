@@ -48,10 +48,17 @@ var _tags: Dictionary = {}
 var _cooldowns: Dictionary = {}  # ability id -> remaining seconds
 var _attack_cd: float = 0.0
 
+# First-person viewmodel (local player): a two-handed longsword that swings.
+var _sword: Node3D = null
+var _sword_rest: Transform3D = Transform3D.IDENTITY
+var _swing_tween: Tween = null
+
 func setup(player: PlayerController, camera: Camera3D, is_local: bool) -> void:
 	_player = player
 	_camera = camera
 	_is_local = is_local
+	if _is_local:
+		_build_viewmodel()
 
 ## Apply a SpecTree's resolved kit: available abilities + active passive tags.
 func configure(abilities: Array, tags: Dictionary) -> void:
@@ -112,6 +119,7 @@ func _cast(id: String) -> void:
 ## Short-range melee swing: damages the first body in front, with lifesteal /
 ## cooldown-on-kill passives applied.
 func _do_melee() -> void:
+	_swing()
 	if _player:
 		GameAudio.play_at(_player.global_position, "swing", "movement")
 	var collider := _hitscan(MELEE_RANGE)
@@ -152,6 +160,61 @@ func _do_immovable() -> void:
 
 func _do_berserk() -> void:
 	pass  # #80: timed attack-speed + lifesteal + spinning AoE
+
+# === First-person viewmodel (two-handed longsword) ===
+
+## Build the sword in front of the camera, on the viewmodel visual layer.
+func _build_viewmodel() -> void:
+	if _camera == null:
+		return
+	_sword = Node3D.new()
+	_sword.name = "SwordViewModel"
+	# Held two-handed, centred-low, blade up and angled across the view.
+	_sword.position = Vector3(0.12, -0.32, -0.55)
+	_sword.rotation = Vector3(deg_to_rad(-62.0), deg_to_rad(8.0), deg_to_rad(10.0))
+	_camera.add_child(_sword)
+	_sword_rest = _sword.transform
+
+	var steel := Color(0.74, 0.77, 0.82)
+	var dark := Color(0.13, 0.12, 0.14)
+	# Parts laid along local +Y (grip → guard → blade), origin at the hands.
+	_add_part(Vector3(0.05, 0.05, 0.05), Vector3(0.0, -0.16, 0.0), dark)        # pommel
+	_add_part(Vector3(0.045, 0.22, 0.045), Vector3(0.0, -0.02, 0.0), dark)       # grip
+	_add_part(Vector3(0.24, 0.045, 0.05), Vector3(0.0, 0.10, 0.0), steel)        # crossguard
+	_add_part(Vector3(0.05, 0.95, 0.018), Vector3(0.0, 0.60, 0.0), steel)        # blade
+	# Two hands gripping the hilt (two-handed hold).
+	var skin := Color(0.85, 0.68, 0.55)
+	_add_part(Vector3(0.07, 0.08, 0.07), Vector3(0.0, 0.02, 0.02), skin)
+	_add_part(Vector3(0.07, 0.08, 0.07), Vector3(0.0, -0.08, 0.02), skin)
+
+func _add_part(part_size: Vector3, offset: Vector3, color: Color) -> void:
+	var mesh := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = part_size
+	mesh.mesh = box
+	mesh.position = offset
+	mesh.layers = PlayerController.VIEWMODEL_VISUAL_LAYER
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = color
+	mat.metallic = 0.3
+	mat.roughness = 0.5
+	mesh.material_override = mat
+	_sword.add_child(mesh)
+
+## A quick diagonal slash of the sword, returning to rest.
+func _swing() -> void:
+	if _sword == null:
+		return
+	if _swing_tween and _swing_tween.is_valid():
+		_swing_tween.kill()
+	_sword.transform = _sword_rest
+	# Wind up slightly, slash down-and-across, then ease back to rest.
+	var windup := _sword_rest.rotated_local(Vector3.RIGHT, deg_to_rad(25.0)).rotated_local(Vector3.FORWARD, deg_to_rad(-20.0))
+	var slash := _sword_rest.rotated_local(Vector3.RIGHT, deg_to_rad(-55.0)).rotated_local(Vector3.FORWARD, deg_to_rad(40.0))
+	_swing_tween = create_tween()
+	_swing_tween.tween_property(_sword, "transform", windup, 0.06)
+	_swing_tween.tween_property(_sword, "transform", slash, 0.08)
+	_swing_tween.tween_property(_sword, "transform", _sword_rest, 0.16)
 
 # === Helpers ===
 
