@@ -459,18 +459,18 @@ func _add_part(part_size: Vector3, offset: Vector3, color: Color, rot_deg: Vecto
 	mesh.material_override = mat
 	_sword.add_child(mesh)
 
-## A wide horizontal slash: wind up to the right, sweep across to the left.
+## A diagonal slash: cock up-and-out to the right, then sweep the tip diagonally
+## down toward screen centre (pitch forward + roll inward).
 func _swing() -> void:
 	if _sword == null:
 		return
 	if _swing_tween and _swing_tween.is_valid():
 		_swing_tween.kill()
 	_sword.transform = _sword_rest
-	# Roll about the blade's forward axis so the tip arcs across the view.
-	var windup := _sword_rest.rotated_local(Vector3.FORWARD, deg_to_rad(60.0))    # cocked right
-	var slash := _sword_rest.rotated_local(Vector3.FORWARD, deg_to_rad(-90.0))    # swept left
+	var windup := _sword_rest.rotated_local(Vector3.RIGHT, deg_to_rad(20.0)).rotated_local(Vector3.FORWARD, deg_to_rad(30.0))
+	var slash := _sword_rest.rotated_local(Vector3.RIGHT, deg_to_rad(-65.0)).rotated_local(Vector3.FORWARD, deg_to_rad(-50.0))
 	_swing_tween = create_tween()
-	_swing_tween.tween_property(_sword, "transform", windup, 0.08)
+	_swing_tween.tween_property(_sword, "transform", windup, 0.07)
 	_swing_tween.tween_property(_sword, "transform", slash, 0.10)
 	_swing_tween.tween_property(_sword, "transform", _sword_rest, 0.18)
 
