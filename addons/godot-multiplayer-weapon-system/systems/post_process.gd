@@ -38,8 +38,30 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	# Only stylise when there's a 3D world on screen (gameplay), never the menus.
+	var cam := get_viewport().get_camera_3d()
 	if _rect != null:
-		_rect.visible = Settings.stylize_enabled and get_viewport().get_camera_3d() != null
+		_rect.visible = Settings.stylize_enabled and cam != null
+	# Feed the camera ray basis so the shader can reconstruct the sky per pixel.
+	if _material != null and cam != null:
+		_material.set_shader_parameter("cam_basis", cam.global_transform.basis)
+		_material.set_shader_parameter("cam_tan", tan(deg_to_rad(cam.fov) * 0.5))
+		var sz := get_viewport().get_visible_rect().size
+		_material.set_shader_parameter("cam_aspect", sz.x / maxf(sz.y, 1.0))
+
+## A DayNightSky mode calls this each round to drive the reconstructed sky.
+## sun_dir is the light's travel direction; day/sunset in 0..1.
+func set_sky(sun_dir: Vector3, day: float, sunset: float) -> void:
+	if _material == null:
+		return
+	_material.set_shader_parameter("sky_enabled", true)
+	_material.set_shader_parameter("sky_sun_dir", sun_dir)
+	_material.set_shader_parameter("sky_day", day)
+	_material.set_shader_parameter("sky_sunset", sunset)
+
+## Disable sky reconstruction (modes without a procedural sky).
+func clear_sky() -> void:
+	if _material:
+		_material.set_shader_parameter("sky_enabled", false)
 
 func _refresh() -> void:
 	if _material == null:
