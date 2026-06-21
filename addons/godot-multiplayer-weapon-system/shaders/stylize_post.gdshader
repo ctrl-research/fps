@@ -17,6 +17,8 @@
 shader_type canvas_item;
 
 uniform sampler2D screen_tex : hint_screen_texture, filter_linear;
+// World-coverage mask (alpha 1 = geometry, 0 = sky). Sky pixels skip the effect.
+uniform sampler2D mask_tex : filter_nearest;
 
 // 0 = Classic posterise, 1 = Realistic grade.
 uniform int color_mode = 0;
@@ -68,6 +70,11 @@ float sobel(vec2 uv, vec2 px) {
 
 void fragment() {
 	vec3 src = texture(screen_tex, SCREEN_UV).rgb;
+	// Leave the sky (no world geometry) untouched.
+	if (texture(mask_tex, SCREEN_UV).a < 0.5) {
+		COLOR = vec4(src, 1.0);
+		return;
+	}
 	vec3 col = (color_mode == 0) ? classic_posterize(src) : realistic_grade(src);
 	if (outline_enabled) {
 		float e = sobel(SCREEN_UV, SCREEN_PIXEL_SIZE * outline_thickness);
