@@ -1,4 +1,5 @@
 extends Node3D
+class_name ClassArena
 """
 Class Arena — the core game mode (issue #78). Offline-vs-bots slice.
 
@@ -22,9 +23,11 @@ const PRE_SECS: float = 5.0
 
 enum Phase { SELECT, SPEC, PRE, LIVE, POST }
 
-## When true (set by lobby/bot-session), the player can re-pick their class /
-## rebuild their spec; wired by a later chunk. Stored now so the option exists.
+## When true, the player rebuilds their spec freely each round and can change
+## class (beginner / bot-session friendly). Off = specs permanent, class fixed.
 @export var allow_respec: bool = false
+## Set by the lobby before launching this scene (carries the lobby toggle).
+static var next_allow_respec: bool = false
 
 var _player: PlayerController = null
 var _bots: Array = []
@@ -44,6 +47,7 @@ var _countdown_label: Label = null
 var _overlay: CanvasLayer = null
 
 func _ready() -> void:
+	allow_respec = next_allow_respec
 	GameState.match_over = true
 	GameState.current_round_state = GameState.RoundState.LIVE
 
@@ -98,25 +102,51 @@ func _on_class_picked(class_id: String) -> void:
 	_enter_spec()
 
 func _enter_spec() -> void:
-	# No point left to spend (tree capped) → skip straight to the countdown.
-	if _spec.points_spent() >= ClassDatabase.MAX_POINTS or _spec.selectable().is_empty():
+	# Normal mode with the tree capped → nothing to pick, go to the countdown.
+	if not allow_respec and (_spec.points_spent() >= ClassDatabase.MAX_POINTS or _spec.selectable().is_empty()):
 		_apply_spec()
 		_enter_pre()
 		return
 	_phase = Phase.SPEC
 	_set_combat_active(false)
 	_countdown_label.visible = false
+	var earned := mini(_round, ClassDatabase.MAX_POINTS)
 	var spec_ui := SpecSelect.new()
-	_overlay = spec_ui
 	add_child(spec_ui)
-	spec_ui.node_picked.connect(_on_node_picked)
-	spec_ui.show_choices(_spec, "Round %d — Spec point" % _round)
+	if allow_respec:
+		spec_ui.allocation_done.connect(_on_alloc_done)
+		spec_ui.change_class_requested.connect(_on_change_class)
+		spec_ui.show_choices(_spec, "Round %d — Build your spec" % _round, earned, true,
+			ClassDatabase.class_ids().size() > 1)
+	else:
+		spec_ui.node_picked.connect(_on_node_picked)
+		spec_ui.show_choices(_spec, "Round %d — Spec point" % _round, 1, false, false)
 	_update_info()
 
 func _on_node_picked(path: int) -> void:
 	_spec.advance(path)
 	_apply_spec()
 	_enter_pre()
+
+func _on_alloc_done() -> void:
+	_apply_spec()
+	_enter_pre()
+
+## Respec mode: re-pick the class, rebuilding the spec on a fresh body.
+func _on_change_class() -> void:
+	var select := ClassSelect.new()
+	add_child(select)
+	select.class_picked.connect(_on_reclass)
+	select.show_classes()
+
+func _on_reclass(class_id: String) -> void:
+	if class_id != _class_id:
+		_class_id = class_id
+		_spec = SpecTree.new(class_id)
+		if is_instance_valid(_player):
+			_player.queue_free()
+		_spawn_player()
+	_enter_spec()
 
 func _enter_pre() -> void:
 	_phase = Phase.PRE
