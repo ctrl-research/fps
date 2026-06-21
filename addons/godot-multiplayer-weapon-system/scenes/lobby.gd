@@ -12,6 +12,7 @@ Shown at startup and when disconnected. Manages connection state display.
 @onready var tutorial_button: Button = $MenuPanel/Margin/VBox/TutorialButton
 var _evolution_button: Button = null
 var _class_arena_button: Button = null
+var _respec_check: CheckButton = null
 @onready var settings_button: Button = $MenuPanel/Margin/VBox/SettingsButton
 @onready var round_test_button: Button = $MenuPanel/Margin/VBox/RoundTestButton
 @onready var disconnect_button: Button = $MenuPanel/Margin/VBox/DisconnectButton
@@ -39,6 +40,12 @@ func _ready() -> void:
 	tutorial_button.get_parent().add_child(_class_arena_button)
 	tutorial_button.get_parent().move_child(_class_arena_button, tutorial_button.get_index() + 1)
 	_class_arena_button.pressed.connect(_on_class_arena_pressed)
+
+	# Beginner/bot-session option: allow rebuilding spec + changing class.
+	_respec_check = CheckButton.new()
+	_respec_check.text = "Allow respec / class change"
+	tutorial_button.get_parent().add_child(_respec_check)
+	tutorial_button.get_parent().move_child(_respec_check, _class_arena_button.get_index() + 1)
 
 	# Evolution (old modifier-vote mode) kept as reference, after Class Arena.
 	_evolution_button = Button.new()
@@ -101,6 +108,7 @@ func _on_tutorial_pressed() -> void:
 
 
 func _on_class_arena_pressed() -> void:
+	ClassArena.next_allow_respec = _respec_check.button_pressed if _respec_check else false
 	get_tree().change_scene_to_file("res://addons/godot-multiplayer-weapon-system/scenes/class_arena.tscn")
 
 func _on_evolution_pressed() -> void:
@@ -203,6 +211,8 @@ func _update_ui(state: int) -> void:
 		_evolution_button.visible = state == MultiplayerManager.ConnectionState.DISCONNECTED
 	if _class_arena_button:
 		_class_arena_button.visible = state == MultiplayerManager.ConnectionState.DISCONNECTED
+	if _respec_check:
+		_respec_check.visible = state == MultiplayerManager.ConnectionState.DISCONNECTED
 	match state:
 		MultiplayerManager.ConnectionState.DISCONNECTED:
 			status_label.text = "Disconnected"
