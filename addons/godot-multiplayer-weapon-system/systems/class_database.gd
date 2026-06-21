@@ -82,7 +82,7 @@ static func _mage() -> Dictionary:
 		"name": "Mage",
 		"description": "Ranged spellcaster. A frail glass cannon — specialise into a Pyromancer or a Frost Warden.",
 		"model": "res://assets/characters/kaykit_adventurers/Mage.glb",
-		"viewmodel": "staff",
+		"viewmodel": "palm",
 		"base_abilities": ["magic_bolt", "blink"],
 		"passive": {
 			"name": "Arcane Focus",

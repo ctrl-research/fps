@@ -66,6 +66,8 @@ var _berserk_tick: float = 0.0
 var _sword: Node3D = null
 var _sword_rest: Transform3D = Transform3D.IDENTITY
 var _swing_tween: Tween = null
+var _orb: MeshInstance3D = null      # mage palm fireball
+var _orb_tween: Tween = null
 
 func setup(player: PlayerController, camera: Camera3D, is_local: bool) -> void:
 	_player = player
@@ -329,8 +331,8 @@ func _build_viewmodel() -> void:
 	var vm: String = "sword"
 	if _player:
 		vm = String(ClassDatabase.get_def(_player.class_id).get("viewmodel", "sword"))
-	if vm == "staff":
-		_build_staff()
+	if vm == "palm":
+		_build_palm()
 	else:
 		_build_sword()
 	_sword_rest = _sword.transform
@@ -349,30 +351,36 @@ func _build_sword() -> void:
 	_add_part(Vector3(0.07, 0.08, 0.07), Vector3(0.0, 0.02, 0.02), skin)
 	_add_part(Vector3(0.07, 0.08, 0.07), Vector3(0.0, -0.08, 0.02), skin)
 
-func _build_staff() -> void:
-	# A wooden shaft held two-handed, with a glowing orb at the top.
-	_sword.position = Vector3(0.18, -0.28, -0.6)
-	_sword.rotation = Vector3(deg_to_rad(-10.0), deg_to_rad(0.0), deg_to_rad(14.0))
-	var wood := Color(0.42, 0.29, 0.17)
-	_add_part(Vector3(0.05, 1.15, 0.05), Vector3(0.0, 0.2, 0.0), wood)           # shaft
+func _build_palm() -> void:
+	# Right hand held palm-up, lower-right, with a fireball hovering above it.
+	_sword.position = Vector3(0.34, -0.34, -0.6)
+	_sword.rotation = Vector3(deg_to_rad(-8.0), deg_to_rad(-10.0), deg_to_rad(0.0))
 	var skin := Color(0.85, 0.68, 0.55)
-	_add_part(Vector3(0.07, 0.08, 0.07), Vector3(0.0, -0.18, 0.02), skin)
-	_add_part(Vector3(0.07, 0.08, 0.07), Vector3(0.0, -0.02, 0.02), skin)
-	# Glowing orb.
-	var orb := MeshInstance3D.new()
+	_add_part(Vector3(0.14, 0.035, 0.16), Vector3(0.0, 0.0, 0.0), skin)          # palm
+	_add_part(Vector3(0.05, 0.03, 0.07), Vector3(0.09, 0.01, -0.02), skin)       # thumb
+	# Fingertips curled slightly up at the front edge (cupping the flame).
+	for fx in [-0.045, 0.0, 0.045]:
+		_add_part(Vector3(0.03, 0.05, 0.04), Vector3(fx, 0.02, -0.10), skin)
+
+	# Hovering fireball.
+	_orb = MeshInstance3D.new()
 	var sphere := SphereMesh.new()
-	sphere.radius = 0.1
-	sphere.height = 0.2
-	orb.mesh = sphere
-	orb.position = Vector3(0.0, 0.82, 0.0)
-	orb.layers = PlayerController.VIEWMODEL_VISUAL_LAYER
+	sphere.radius = 0.11
+	sphere.height = 0.22
+	_orb.mesh = sphere
+	_orb.position = Vector3(0.0, 0.16, -0.01)
+	_orb.layers = PlayerController.VIEWMODEL_VISUAL_LAYER
 	var glow := StandardMaterial3D.new()
 	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	glow.albedo_color = Color(0.5, 0.8, 1.0)
+	glow.albedo_color = Color(1.0, 0.55, 0.2)
 	glow.emission_enabled = true
-	glow.emission = Color(0.5, 0.8, 1.0)
-	orb.material_override = glow
-	_sword.add_child(orb)
+	glow.emission = Color(1.0, 0.45, 0.15)
+	_orb.material_override = glow
+	_sword.add_child(_orb)
+	# Gentle hover bob.
+	_orb_tween = create_tween().set_loops()
+	_orb_tween.tween_property(_orb, "position:y", 0.19, 0.9).set_trans(Tween.TRANS_SINE)
+	_orb_tween.tween_property(_orb, "position:y", 0.13, 0.9).set_trans(Tween.TRANS_SINE)
 
 func _add_part(part_size: Vector3, offset: Vector3, color: Color) -> void:
 	var mesh := MeshInstance3D.new()
