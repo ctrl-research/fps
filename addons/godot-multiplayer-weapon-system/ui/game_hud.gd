@@ -34,6 +34,7 @@ var _scores_label: Label = null
 var _buy_hint: Label = null
 var _minimap: Control = null
 var _status_label: Label = null
+var _crosshair: Control = null
 
 # Hold-Tab scoreboard overlay.
 var _scoreboard_root: Control = null
@@ -53,6 +54,9 @@ func bind(player: PlayerController) -> void:
 	PlayerLoadout.loadout_changed.connect(_refresh_loadout)
 	GameState.team_score_updated.connect(_on_score_updated)
 	GameState.round_state_changed.connect(_on_round_state_changed)
+	Settings.settings_changed.connect(func() -> void:
+		if _crosshair:
+			_crosshair.queue_redraw())
 
 	_on_health_changed(player.health, player.max_health)
 	_refresh_loadout()
@@ -134,6 +138,13 @@ func _build_ui() -> void:
 	add_child(_minimap)
 	_set_rect(_minimap, 1.0, 0.0, 1.0, 0.0, -(MINIMAP_SIZE + 16.0), 16.0, -16.0, MINIMAP_SIZE + 16.0)
 
+	# Aiming crosshair, centred; shape from Settings.crosshair_style.
+	_crosshair = Control.new()
+	_crosshair.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_crosshair.draw.connect(_draw_crosshair)
+	add_child(_crosshair)
+	_set_rect(_crosshair, 0.5, 0.5, 0.5, 0.5, -32.0, -32.0, 32.0, 32.0)
+
 	# Center: downed / eliminated status.
 	_status_label = Label.new()
 	_status_label.add_theme_font_size_override("font_size", 40)
@@ -155,6 +166,33 @@ func _set_rect(c: Control, al: float, at: float, ar: float, ab: float,
 	c.offset_top = ot
 	c.offset_right = orr
 	c.offset_bottom = ob
+
+# === Crosshair ===
+
+## Draw the aiming reticle (shape from Settings.crosshair_style), centred.
+func _draw_crosshair() -> void:
+	var c := _crosshair.size * 0.5
+	var col := Color(0.95, 0.95, 0.95, 0.9)
+	var t := 2.0
+	var gap := 4.0
+	var length := 8.0
+	match Settings.crosshair_style:
+		1:  # Dot
+			_crosshair.draw_circle(c, 2.5, col)
+		2:  # Circle
+			_crosshair.draw_arc(c, 7.0, 0.0, TAU, 32, col, t)
+		3:  # X
+			for d: Vector2 in [Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)]:
+				var dir := d.normalized()
+				_crosshair.draw_line(c + dir * gap, c + dir * (gap + length), col, t)
+		4:  # Star (cross + diagonal spokes)
+			for d: Vector2 in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT,
+					Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)]:
+				var dir := d.normalized()
+				_crosshair.draw_line(c + dir * gap, c + dir * (gap + length * 0.8), col, t)
+		_:  # Cross (default)
+			for d: Vector2 in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:
+				_crosshair.draw_line(c + d * gap, c + d * (gap + length), col, t)
 
 # === Minimap ===
 
