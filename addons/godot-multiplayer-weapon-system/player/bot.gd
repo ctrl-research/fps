@@ -3,9 +3,10 @@ class_name Bot
 """
 Practice-range combat bot.
 
-Takes weapon damage like a player (exposes request_damage), is defeated at 0 HP
-and respawns after 5 seconds, and periodically fires at the nearest living
-player with a chance to miss. Stationary — it only turns to face its target.
+Takes damage like a player (exposes request_damage), is defeated at 0 HP and
+respawns after 5 seconds. A melee chaser: it advances on the nearest living
+player it can see and strikes when in range (no pathfinding — it moves in a
+straight line, so it only pursues with line of sight).
 """
 
 ## Emitted when the bot is defeated; carries the attacker's peer id (for kill
@@ -18,12 +19,12 @@ signal defeated(by_peer_id: int)
 
 const GRAVITY: float = 20.0
 const RESPAWN_DELAY: float = 5.0
-const FIRE_INTERVAL: float = 1.8
-const SHOT_DAMAGE: float = 6.0
-const FIRE_RANGE: float = 70.0
-const AIM_SPREAD: float = 0.06
-const FLASH_TIME: float = 0.06
 const HIT_FLASH_TIME: float = 0.05
+# Melee chaser tuning.
+const MOVE_SPEED: float = 4.5
+const MELEE_RANGE: float = 2.6
+const MELEE_DAMAGE: float = 14.0
+const ATTACK_INTERVAL: float = 1.1
 
 @onready var _mesh: MeshInstance3D = $Mesh
 @onready var _head: MeshInstance3D = $Head
@@ -43,13 +44,11 @@ var stat_fire_rate_mult: float = 1.0
 var health: float = 0.0
 var _dead: bool = false
 var _respawn_timer: float = 0.0
-var _fire_timer: float = 0.0
-var _flash_timer: float = 0.0
+var _attack_timer: float = 0.0
 var _hit_flash_timer: float = 0.0
 var _material: StandardMaterial3D = null
 var _spawn_position: Vector3 = Vector3.ZERO
 var _last_attacker_id: int = 0
-var _tracer: MeshInstance3D = null
 var _model: CharacterModel = null
 var _prev_anim_pos: Vector3 = Vector3.ZERO
 var _stun_time: float = 0.0
@@ -77,7 +76,6 @@ func _ready() -> void:
 	_model.setup(BOT_MODEL)
 	_model.set_tint(CategoryColors.ENEMY)
 
-	_build_tracer()
 	_reset()
 
 func _physics_process(delta: float) -> void:
@@ -89,42 +87,44 @@ func _physics_process(delta: float) -> void:
 			_reset()
 		return
 
-	if not is_on_floor():
-		velocity.y -= GRAVITY * delta
-	else:
-		velocity.y = 0.0
-	velocity.x = 0.0
-	velocity.z = 0.0
-	move_and_slide()
+	var grav := 0.0 if is_on_floor() else -GRAVITY * delta
+	velocity.y += grav
 
 	if _slow_time > 0.0:
 		_slow_time -= delta
 		if _slow_time <= 0.0:
 			_slow_factor = 1.0
 	if _stun_time > 0.0:
-		# Stunned (e.g. Shield Bash): no aiming or firing.
+		# Stunned (e.g. Shield Bash): frozen, no chasing or striking.
 		_stun_time -= delta
+		velocity.x = 0.0
+		velocity.z = 0.0
+		move_and_slide()
 		return
+
+	# Chase the nearest visible player; strike when in melee range.
+	var target := _find_target()
+	var move := Vector3.ZERO
+	if target != null:
+		_face(target)
+		var to := target.global_position - global_position
+		to.y = 0.0
+		if to.length() > MELEE_RANGE:
+			move = to.normalized() * MOVE_SPEED / maxf(_slow_factor, 0.01)
+		else:
+			_attack_timer -= delta
+			if _attack_timer <= 0.0:
+				_attack_timer = ATTACK_INTERVAL * stat_fire_rate_mult * _slow_factor
+				_melee_attack(target)
+	velocity.x = move.x
+	velocity.z = move.z
+	move_and_slide()
 
 	if _model != null:
 		var moved := global_position - _prev_anim_pos
 		_prev_anim_pos = global_position
 		_model.set_locomotion(Vector2(moved.x, moved.z).length() / maxf(delta, 0.0001), is_on_floor())
 
-	var target := _find_target()
-	if target != null:
-		_face(target)
-		_fire_timer -= delta
-		if _fire_timer <= 0.0:
-			_fire_timer = FIRE_INTERVAL * stat_fire_rate_mult * _slow_factor
-			_shoot_at(target)
-
-	if _flash_timer > 0.0:
-		_flash_timer -= delta
-		if _flash_timer <= 0.0:
-			_muzzle_flash.visible = false
-			if _tracer != null:
-				_tracer.visible = false
 	if _hit_flash_timer > 0.0:
 		_hit_flash_timer -= delta
 		if _hit_flash_timer <= 0.0:
@@ -161,8 +161,8 @@ func _reset() -> void:
 	global_position = _spawn_position
 	_prev_anim_pos = _spawn_position
 	velocity = Vector3.ZERO
-	# Stagger so a group of bots doesn't fire in unison.
-	_fire_timer = FIRE_INTERVAL * randf_range(0.4, 1.2)
+	# Stagger so a group of bots doesn't strike in unison.
+	_attack_timer = ATTACK_INTERVAL * randf_range(0.4, 1.2)
 	_label.text = "%d" % int(health)
 	_update_color()
 
@@ -223,59 +223,11 @@ func _face(target: PlayerController) -> void:
 	if global_position.distance_to(flat) > 0.05:
 		look_at(flat, Vector3.UP)
 
-func _shoot_at(target: PlayerController) -> void:
-	_muzzle_flash.visible = true
-	_flash_timer = FLASH_TIME
-	GameAudio.play_at(_eye.global_position, "gunshot_assault_rifle", "weapon")
-
-	var eye_pos := _eye.global_position
-	var aim_point := target.global_position + Vector3(0.0, 1.0, 0.0)
-	var dir := (aim_point - eye_pos).normalized()
-	dir = (dir + Vector3(
-		randf_range(-AIM_SPREAD, AIM_SPREAD),
-		randf_range(-AIM_SPREAD, AIM_SPREAD),
-		randf_range(-AIM_SPREAD, AIM_SPREAD))).normalized()
-
-	var space := get_world_3d().direct_space_state
-	var query := PhysicsRayQueryParameters3D.create(eye_pos, eye_pos + dir * FIRE_RANGE)
-	query.collide_with_bodies = true
-	query.exclude = [get_rid()]
-	var hit := space.intersect_ray(query)
-
-	var endpoint: Vector3 = eye_pos + dir * FIRE_RANGE
-	if not hit.is_empty():
-		endpoint = hit.get("position")
-		var collider = hit.get("collider")
-		# Only the player takes bot fire (walls/dummies/other bots block it).
-		if collider is PlayerController:
-			(collider as PlayerController).request_damage(SHOT_DAMAGE * stat_damage_mult, authority_peer_id)
-	_show_tracer(eye_pos, endpoint)
-
-## Brief glowing line from the muzzle to the shot's endpoint, so it's obvious the
-## bot is firing. Hidden together with the muzzle flash.
-func _build_tracer() -> void:
-	_tracer = MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = Vector3(0.05, 0.05, 1.0)
-	_tracer.mesh = box
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.albedo_color = Color(1.0, 0.85, 0.3)
-	mat.emission_enabled = true
-	mat.emission = Color(1.0, 0.8, 0.2)
-	_tracer.material_override = mat
-	_tracer.top_level = true  # set world transform directly, ignoring the bot's
-	_tracer.visible = false
-	add_child(_tracer)
-
-func _show_tracer(from: Vector3, to: Vector3) -> void:
-	var length := from.distance_to(to)
-	if length < 0.2:
-		return
-	_tracer.global_position = (from + to) * 0.5
-	_tracer.look_at(to, Vector3.UP)
-	_tracer.scale = Vector3(1.0, 1.0, length)
-	_tracer.visible = true
+## Melee strike: damage the target if it's still within reach when the swing lands.
+func _melee_attack(target: PlayerController) -> void:
+	GameAudio.play_at(global_position, "swing", "movement")
+	if is_instance_valid(target) and global_position.distance_to(target.global_position) <= MELEE_RANGE + 0.6:
+		target.request_damage(MELEE_DAMAGE * stat_damage_mult, authority_peer_id)
 
 func _update_color() -> void:
 	_material.albedo_color = Color(0.8, 0.3, 0.3)
