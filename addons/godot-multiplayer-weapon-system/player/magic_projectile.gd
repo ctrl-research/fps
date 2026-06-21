@@ -18,10 +18,12 @@ var color: Color = Color(0.5, 0.7, 1.0)
 var lifesteal: float = 0.0    # fraction of damage healed back to the shooter
 var slow_factor: float = 1.0  # >1 = slower (Frostbite); applied for slow_time
 var slow_time: float = 0.0
+var pierce: bool = false      # pass through enemies (stops on walls)
 
 var _dir: Vector3 = Vector3.FORWARD
 var _age: float = 0.0
 var _spent: bool = false
+var _hit: Array = []          # bodies already hit (pierce: avoid double-hits)
 
 func _ready() -> void:
 	collision_layer = 0
@@ -62,10 +64,26 @@ func _physics_process(delta: float) -> void:
 func _on_body_entered(body: Node) -> void:
 	if _spent or body == shooter:
 		return
+	# Hit a wall / non-damageable body: burst if AoE, then stop (even if piercing).
+	if not body.has_method("request_damage"):
+		_spent = true
+		if aoe_radius > 0.0:
+			_burst()
+		queue_free()
+		return
+	# Piercing: damage each enemy once and keep flying.
+	if pierce and aoe_radius <= 0.0:
+		if body in _hit:
+			return
+		_hit.append(body)
+		body.request_damage(damage, attacker_id)
+		_apply_on_hit(body)
+		return
+	# Normal: single hit (or AoE burst), then despawn.
 	_spent = true
 	if aoe_radius > 0.0:
 		_burst()
-	elif body.has_method("request_damage"):
+	else:
 		body.request_damage(damage, attacker_id)
 		_apply_on_hit(body)
 	queue_free()

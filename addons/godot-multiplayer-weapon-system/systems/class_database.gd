@@ -26,7 +26,7 @@ static func class_ids() -> Array:
 	return _classes().keys()
 
 static func _classes() -> Dictionary:
-	return {"warrior": _warrior(), "mage": _mage()}
+	return {"warrior": _warrior(), "mage": _mage(), "archer": _archer()}
 
 # === Warrior (issue #80) ===
 
@@ -115,6 +115,52 @@ static func _mage() -> Dictionary:
 					{"id": "frost_nova", "name": "Frost Nova", "desc": "Ability: AoE around you that damages and slows", "icon": "NVA", "grants": ["frost_nova"]},
 					{"id": "hardened", "name": "Hardened", "desc": "+18% max health", "icon": "HP", "stats": {"health": 1.18}},
 					{"id": "blizzard", "name": "Blizzard", "desc": "CAPSTONE: strong AoE damage and heavy slow at the aim point", "icon": "★", "grants": ["blizzard"]},
+				],
+			},
+		],
+	}
+
+# === Archer (issue #88) ===
+
+static func _archer() -> Dictionary:
+	return {
+		"id": "archer",
+		"name": "Archer",
+		"description": "Mobile ranged bow user. Specialise into a precise Marksman or a nimble Skirmisher.",
+		"model": "res://assets/characters/kaykit_adventurers/Ranger.glb",
+		"viewmodel": "bow",
+		"base_abilities": ["arrow", "dash"],
+		"passive": {
+			"name": "Eagle Eye",
+			"desc": "+10% damage and +10% attack speed",
+			"icon": "EYE",
+			"stats": {"damage": 1.10, "fire_rate": 0.9},
+		},
+		"paths": [
+			{
+				"name": "Marksman",
+				"nodes": [
+					{"id": "steady_aim", "name": "Steady Aim", "desc": "+12% damage", "icon": "DMG", "stats": {"damage": 1.12}},
+					{"id": "piercing_tips", "name": "Piercing Tips", "desc": "Your arrows pierce enemies", "icon": "PRC", "tags": ["pierce"]},
+					{"id": "deadeye", "name": "Deadeye", "desc": "+15% attack speed", "icon": "AS", "stats": {"fire_rate": 0.85}},
+					{"id": "hunters_mark", "name": "Hunter's Mark", "desc": "Arrows heal you (lifesteal)", "icon": "LS", "tags": ["lifesteal"], "values": {"lifesteal": 0.12}},
+					{"id": "lethality", "name": "Lethality", "desc": "+20% damage", "icon": "DM+", "stats": {"damage": 1.20}},
+					{"id": "power_shot", "name": "Power Shot", "desc": "Ability: a high-damage piercing arrow", "icon": "PWR", "grants": ["power_shot"]},
+					{"id": "focus", "name": "Focus", "desc": "+15% damage", "icon": "DM2", "stats": {"damage": 1.15}},
+					{"id": "snipe", "name": "Snipe", "desc": "CAPSTONE: a massive piercing arrow", "icon": "★", "grants": ["snipe"]},
+				],
+			},
+			{
+				"name": "Skirmisher",
+				"nodes": [
+					{"id": "fleet_footed", "name": "Fleet Footed", "desc": "+12% move speed", "icon": "SPD", "stats": {"speed": 1.12}},
+					{"id": "crippling_shots", "name": "Crippling Shots", "desc": "Your arrows slow enemies", "icon": "SLW", "tags": ["stagger"], "values": {"slow": 0.3, "time": 1.2}},
+					{"id": "light_armor", "name": "Light Armor", "desc": "-15% damage taken", "icon": "DR", "stats": {"damage_taken": 0.85}},
+					{"id": "second_wind", "name": "Second Wind", "desc": "Regenerate health out of combat", "icon": "REG", "tags": ["regen"], "values": {"per_sec": 5.0}},
+					{"id": "swift", "name": "Swift", "desc": "+15% move speed", "icon": "SP+", "stats": {"speed": 1.15}},
+					{"id": "multishot", "name": "Multishot", "desc": "Ability: fire three arrows in a spread", "icon": "MLT", "grants": ["multishot"]},
+					{"id": "adrenaline", "name": "Adrenaline", "desc": "Kills reduce ability cooldowns", "icon": "CDR", "tags": ["rampage"], "values": {"cdr": 0.5}},
+					{"id": "arrow_storm", "name": "Arrow Storm", "desc": "CAPSTONE: a rain of arrows at the aim point", "icon": "★", "grants": ["arrow_storm"]},
 				],
 			},
 		],

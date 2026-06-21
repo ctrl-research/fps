@@ -30,16 +30,21 @@ const BLINK_DISTANCE: float = 9.0
 const ABILITY_DEFS: Dictionary = {
 	"melee": {"slot": "attack", "interval": 0.55},
 	"magic_bolt": {"slot": "attack", "interval": 0.7},
+	"arrow": {"slot": "attack", "interval": 0.5},
 	"dash": {"slot": "dash", "cooldown": 4.0},
 	"blink": {"slot": "dash", "cooldown": 3.0},
 	"shield_bash": {"slot": "ability1", "cooldown": 8.0},
 	"leap_strike": {"slot": "ability1", "cooldown": 7.0},
 	"fireball": {"slot": "ability1", "cooldown": 6.0},
 	"frost_nova": {"slot": "ability1", "cooldown": 7.0},
+	"power_shot": {"slot": "ability1", "cooldown": 6.0},
+	"multishot": {"slot": "ability1", "cooldown": 7.0},
 	"immovable": {"slot": "ult", "cooldown": 40.0},
 	"berserk": {"slot": "ult", "cooldown": 45.0},
 	"meteor": {"slot": "ult", "cooldown": 35.0},
 	"blizzard": {"slot": "ult", "cooldown": 38.0},
+	"snipe": {"slot": "ult", "cooldown": 30.0},
+	"arrow_storm": {"slot": "ult", "cooldown": 35.0},
 }
 ## Which input action triggers each slot.
 const SLOT_ACTION: Dictionary = {
@@ -137,16 +142,21 @@ func _cast(id: String) -> void:
 	match id:
 		"melee": _do_melee()
 		"magic_bolt": _do_magic_bolt()
+		"arrow": _do_arrow()
 		"dash": _do_dash()
 		"blink": _do_blink()
 		"shield_bash": _do_shield_bash()
 		"leap_strike": _do_leap_strike()
 		"fireball": _do_fireball()
 		"frost_nova": _do_frost_nova()
+		"power_shot": _do_power_shot()
+		"multishot": _do_multishot()
 		"immovable": _do_immovable()
 		"berserk": _do_berserk()
 		"meteor": _do_meteor()
 		"blizzard": _do_blizzard()
+		"snipe": _do_snipe()
+		"arrow_storm": _do_arrow_storm()
 
 ## Short-range melee swing: damages the first body in front, with lifesteal /
 ## cooldown-on-kill passives applied.
@@ -265,18 +275,54 @@ func _do_blizzard() -> void:
 	_aoe_damage(target, 6.5, MELEE_DAMAGE * 1.5 * _damage_mult())
 	_aoe_slow(target, 6.5, 2.0, 4.0)
 
-## Spawn a MagicProjectile from the camera along the aim direction.
-func _spawn_projectile(damage: float, aoe_radius: float, color: Color, speed: float) -> void:
+## Arrow (base attack): a fast single-target projectile; pierces with Piercing Tips.
+func _do_arrow() -> void:
+	_release()
+	_spawn_projectile(BOLT_DAMAGE * _damage_mult(), 0.0, Color(0.85, 0.78, 0.55), 60.0, _tags.has("pierce"))
+
+## Power Shot (Marksman 6): a high-damage piercing arrow.
+func _do_power_shot() -> void:
+	_release()
+	_spawn_projectile(MELEE_DAMAGE * 1.6 * _damage_mult(), 0.0, Color(1.0, 0.9, 0.4), 70.0, true)
+
+## Snipe (Marksman capstone): a massive piercing arrow.
+func _do_snipe() -> void:
+	_release()
+	_spawn_projectile(MELEE_DAMAGE * 4.0 * _damage_mult(), 0.0, Color(1.0, 1.0, 0.6), 95.0, true)
+
+## Multishot (Skirmisher 6): three arrows in a horizontal spread.
+func _do_multishot() -> void:
+	_release()
 	if _camera == null:
 		return
+	var forward := -_camera.global_transform.basis.z
+	for deg: float in [-12.0, 0.0, 12.0]:
+		var d := forward.rotated(Vector3.UP, deg_to_rad(deg))
+		_spawn_projectile(BOLT_DAMAGE * 0.8 * _damage_mult(), 0.0, Color(0.85, 0.78, 0.55), 60.0, _tags.has("pierce"), d)
+
+## Arrow Storm (Skirmisher capstone): a rain of arrows (AoE) at the aim point.
+func _do_arrow_storm() -> void:
+	var target := _aim_point(40.0)
+	await get_tree().create_timer(0.6).timeout
+	_aoe_damage(target, 6.0, MELEE_DAMAGE * 2.0 * _damage_mult())
+	_aoe_slow(target, 6.0, 1.5, 2.0)
+
+## Spawn a MagicProjectile from the camera. `dir` defaults to the aim direction.
+func _spawn_projectile(damage: float, aoe_radius: float, color: Color, speed: float,
+		pierce: bool = false, dir: Vector3 = Vector3.ZERO) -> void:
+	if _camera == null:
+		return
+	var forward := -_camera.global_transform.basis.z
+	var fly := dir if dir != Vector3.ZERO else forward
 	var proj := MagicProjectile.new()
 	proj.damage = damage
 	proj.aoe_radius = aoe_radius
 	proj.color = color
 	proj.speed = speed
+	proj.pierce = pierce
 	proj.attacker_id = _peer_id()
 	proj.shooter = _player
-	# Carry the caster's on-hit passives (Spell Siphon lifesteal, Frostbite slow).
+	# Carry the caster's on-hit passives (lifesteal, slow).
 	if _tags.has("lifesteal"):
 		proj.lifesteal = float(_tags["lifesteal"].get("lifesteal", 0.0))
 	if _tags.has("stagger"):
@@ -285,8 +331,7 @@ func _spawn_projectile(damage: float, aoe_radius: float, color: Color, speed: fl
 		proj.slow_time = float(s.get("time", 0.0))
 	var world := _player.get_parent() if _player else get_tree().current_scene
 	world.add_child(proj)
-	var forward := -_camera.global_transform.basis.z
-	proj.launch(_camera.global_position + forward * 0.8, forward)
+	proj.launch(_camera.global_position + forward * 0.8, fly)
 
 ## Slow every damageable body within radius (for frost abilities).
 func _aoe_slow(center: Vector3, radius: float, factor: float, seconds: float) -> void:
@@ -331,10 +376,10 @@ func _build_viewmodel() -> void:
 	var vm: String = "sword"
 	if _player:
 		vm = String(ClassDatabase.get_def(_player.class_id).get("viewmodel", "sword"))
-	if vm == "palm":
-		_build_palm()
-	else:
-		_build_sword()
+	match vm:
+		"palm": _build_palm()
+		"bow": _build_bow()
+		_: _build_sword()
 	_sword_rest = _sword.transform
 
 func _build_sword() -> void:
@@ -382,12 +427,25 @@ func _build_palm() -> void:
 	_orb_tween.tween_property(_orb, "position:y", 0.19, 0.9).set_trans(Tween.TRANS_SINE)
 	_orb_tween.tween_property(_orb, "position:y", 0.13, 0.9).set_trans(Tween.TRANS_SINE)
 
-func _add_part(part_size: Vector3, offset: Vector3, color: Color) -> void:
+func _build_bow() -> void:
+	# A bow held in the lower-right: grip + two angled limbs, string, nocked arrow.
+	_sword.position = Vector3(0.3, -0.4, -0.62)
+	_sword.rotation = Vector3(deg_to_rad(0.0), deg_to_rad(-24.0), deg_to_rad(8.0))
+	var wood := Color(0.42, 0.29, 0.17)
+	_add_part(Vector3(0.04, 0.22, 0.04), Vector3(0.0, 0.0, 0.0), wood)                          # grip
+	_add_part(Vector3(0.03, 0.45, 0.03), Vector3(0.0, 0.3, 0.05), wood, Vector3(28.0, 0.0, 0.0))   # upper limb
+	_add_part(Vector3(0.03, 0.45, 0.03), Vector3(0.0, -0.3, 0.05), wood, Vector3(-28.0, 0.0, 0.0)) # lower limb
+	_add_part(Vector3(0.006, 0.92, 0.006), Vector3(0.0, 0.0, 0.12), Color(0.8, 0.8, 0.8))       # string
+	_add_part(Vector3(0.012, 0.012, 0.55), Vector3(0.0, 0.0, -0.16), Color(0.55, 0.4, 0.25))    # arrow shaft
+	_add_part(Vector3(0.03, 0.03, 0.04), Vector3(0.0, 0.0, -0.44), Color(0.85, 0.85, 0.9))      # arrowhead
+
+func _add_part(part_size: Vector3, offset: Vector3, color: Color, rot_deg: Vector3 = Vector3.ZERO) -> void:
 	var mesh := MeshInstance3D.new()
 	var box := BoxMesh.new()
 	box.size = part_size
 	mesh.mesh = box
 	mesh.position = offset
+	mesh.rotation = Vector3(deg_to_rad(rot_deg.x), deg_to_rad(rot_deg.y), deg_to_rad(rot_deg.z))
 	mesh.layers = PlayerController.VIEWMODEL_VISUAL_LAYER
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = color
@@ -421,6 +479,18 @@ func _thrust() -> void:
 	_swing_tween = create_tween()
 	_swing_tween.tween_property(_sword, "transform", jab, 0.07)
 	_swing_tween.tween_property(_sword, "transform", _sword_rest, 0.14)
+
+## A quick bow draw-back and release-snap, returning to rest.
+func _release() -> void:
+	if _sword == null:
+		return
+	if _swing_tween and _swing_tween.is_valid():
+		_swing_tween.kill()
+	_sword.transform = _sword_rest
+	var drawn := _sword_rest.translated_local(Vector3(0.0, 0.0, 0.1))
+	_swing_tween = create_tween()
+	_swing_tween.tween_property(_sword, "transform", drawn, 0.05)
+	_swing_tween.tween_property(_sword, "transform", _sword_rest, 0.12)
 
 # === Helpers ===
 
