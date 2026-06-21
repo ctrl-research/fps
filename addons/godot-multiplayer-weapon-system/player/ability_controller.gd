@@ -21,15 +21,25 @@ const MELEE_RANGE: float = 2.6
 const MELEE_DAMAGE: float = 34.0
 const MELEE_INTERVAL: float = 0.55
 const DASH_SPEED: float = 16.0
+const BOLT_DAMAGE: float = 22.0
+const BOLT_INTERVAL: float = 0.7
+const BLINK_DISTANCE: float = 9.0
 
-## ability id -> {slot, cooldown}. slot maps to an input action below.
+## ability id -> {slot, cooldown}. slot maps to an input action below; "attack"
+## abilities also use "interval" (their base swing/cast time).
 const ABILITY_DEFS: Dictionary = {
-	"melee": {"slot": "attack", "cooldown": 0.0},
+	"melee": {"slot": "attack", "interval": 0.55},
+	"magic_bolt": {"slot": "attack", "interval": 0.7},
 	"dash": {"slot": "dash", "cooldown": 4.0},
+	"blink": {"slot": "dash", "cooldown": 3.0},
 	"shield_bash": {"slot": "ability1", "cooldown": 8.0},
 	"leap_strike": {"slot": "ability1", "cooldown": 7.0},
+	"fireball": {"slot": "ability1", "cooldown": 6.0},
+	"frost_nova": {"slot": "ability1", "cooldown": 7.0},
 	"immovable": {"slot": "ult", "cooldown": 40.0},
 	"berserk": {"slot": "ult", "cooldown": 45.0},
+	"meteor": {"slot": "ult", "cooldown": 35.0},
+	"blizzard": {"slot": "ult", "cooldown": 38.0},
 }
 ## Which input action triggers each slot.
 const SLOT_ACTION: Dictionary = {
@@ -100,11 +110,12 @@ func _handle_input() -> void:
 		_try_cast(id, def)
 
 func _try_cast(id: String, def: Dictionary) -> void:
-	if id == "melee":
+	# Primary attack (melee swing / magic bolt) — gated by the attack interval.
+	if def.get("slot", "") == "attack":
 		if _attack_cd <= 0.0:
-			_do_melee()
-			# Berserk roughly halves the swing interval.
-			_attack_cd = MELEE_INTERVAL * _fire_rate_mult() * (0.5 if _berserk_time > 0.0 else 1.0)
+			_cast(id)
+			# Berserk roughly halves the attack interval.
+			_attack_cd = float(def.get("interval", 0.55)) * _fire_rate_mult() * (0.5 if _berserk_time > 0.0 else 1.0)
 		return
 	if _cooldowns.get(id, 0.0) > 0.0:
 		return
@@ -122,11 +133,18 @@ func reduce_cooldowns(seconds: float) -> void:
 
 func _cast(id: String) -> void:
 	match id:
+		"melee": _do_melee()
+		"magic_bolt": _do_magic_bolt()
 		"dash": _do_dash()
+		"blink": _do_blink()
 		"shield_bash": _do_shield_bash()
 		"leap_strike": _do_leap_strike()
+		"fireball": _do_fireball()
+		"frost_nova": _do_frost_nova()
 		"immovable": _do_immovable()
 		"berserk": _do_berserk()
+		"meteor": _do_meteor()
+		"blizzard": _do_blizzard()
 
 ## Short-range melee swing: damages the first body in front, with lifesteal /
 ## cooldown-on-kill passives applied.
@@ -196,31 +214,165 @@ func _do_berserk() -> void:
 	_berserk_time = 6.0
 	_berserk_tick = 0.0
 
-# === First-person viewmodel (two-handed longsword) ===
+# === Mage abilities ===
 
-## Build the sword in front of the camera, on the viewmodel visual layer.
+## Magic Bolt (base attack): a single-target travelling projectile.
+func _do_magic_bolt() -> void:
+	_thrust()
+	_spawn_projectile(BOLT_DAMAGE * _damage_mult(), 0.0, Color(0.5, 0.7, 1.0), 42.0)
+
+## Blink (mobility): teleport forward to the first clear spot, up to BLINK_DISTANCE.
+func _do_blink() -> void:
+	if _player == null or _camera == null:
+		return
+	var dir := -_camera.global_transform.basis.z
+	dir.y = 0.0
+	dir = dir.normalized()
+	var from := _player.global_position
+	var space := _player.get_world_3d().direct_space_state
+	var query := PhysicsRayQueryParameters3D.create(from + Vector3.UP, from + Vector3.UP + dir * BLINK_DISTANCE)
+	query.collision_mask = 1
+	query.exclude = [_player.get_rid()]
+	var hit := space.intersect_ray(query)
+	var dist := BLINK_DISTANCE
+	if not hit.is_empty():
+		dist = maxf(0.0, from.distance_to(hit.get("position") as Vector3) - 1.0)
+	_player.global_position = from + dir * dist
+
+## Fireball (Pyromancer 6): a projectile that bursts on impact for AoE.
+func _do_fireball() -> void:
+	_thrust()
+	_spawn_projectile(MELEE_DAMAGE * 1.2 * _damage_mult(), 4.0, Color(1.0, 0.5, 0.2), 32.0)
+
+## Frost Nova (Frost Warden 6): instant AoE around the caster that damages + slows.
+func _do_frost_nova() -> void:
+	if _player == null:
+		return
+	_aoe_damage(_player.global_position, 5.0, MELEE_DAMAGE * 0.8 * _damage_mult())
+	_aoe_slow(_player.global_position, 5.0, 1.5, 2.5)
+
+## Meteor (Pyromancer capstone): a heavy AoE at the aim point after a short delay.
+func _do_meteor() -> void:
+	var target := _aim_point(40.0)
+	await get_tree().create_timer(1.0).timeout
+	_aoe_damage(target, 6.0, MELEE_DAMAGE * 3.0 * _damage_mult())
+
+## Blizzard (Frost Warden capstone): strong AoE damage + heavy slow at the aim point.
+func _do_blizzard() -> void:
+	var target := _aim_point(40.0)
+	_aoe_damage(target, 6.5, MELEE_DAMAGE * 1.5 * _damage_mult())
+	_aoe_slow(target, 6.5, 2.0, 4.0)
+
+## Spawn a MagicProjectile from the camera along the aim direction.
+func _spawn_projectile(damage: float, aoe_radius: float, color: Color, speed: float) -> void:
+	if _camera == null:
+		return
+	var proj := MagicProjectile.new()
+	proj.damage = damage
+	proj.aoe_radius = aoe_radius
+	proj.color = color
+	proj.speed = speed
+	proj.attacker_id = _peer_id()
+	proj.shooter = _player
+	# Carry the caster's on-hit passives (Spell Siphon lifesteal, Frostbite slow).
+	if _tags.has("lifesteal"):
+		proj.lifesteal = float(_tags["lifesteal"].get("lifesteal", 0.0))
+	if _tags.has("stagger"):
+		var s: Dictionary = _tags["stagger"]
+		proj.slow_factor = 1.0 + float(s.get("slow", 0.0))
+		proj.slow_time = float(s.get("time", 0.0))
+	var world := _player.get_parent() if _player else get_tree().current_scene
+	world.add_child(proj)
+	var forward := -_camera.global_transform.basis.z
+	proj.launch(_camera.global_position + forward * 0.8, forward)
+
+## Slow every damageable body within radius (for frost abilities).
+func _aoe_slow(center: Vector3, radius: float, factor: float, seconds: float) -> void:
+	if _player == null:
+		return
+	var space := _player.get_world_3d().direct_space_state
+	var sphere := SphereShape3D.new()
+	sphere.radius = radius
+	var params := PhysicsShapeQueryParameters3D.new()
+	params.shape = sphere
+	params.transform = Transform3D(Basis(), center)
+	params.collision_mask = 1
+	params.exclude = [_player.get_rid()]
+	for result in space.intersect_shape(params, 24):
+		var collider = result.get("collider")
+		if collider and collider.has_method("apply_slow"):
+			collider.apply_slow(factor, seconds)
+
+## World point the camera is aimed at (raycast), or a point `dist` ahead if clear.
+func _aim_point(dist: float) -> Vector3:
+	if _camera == null:
+		return Vector3.ZERO
+	var origin := _camera.global_position
+	var forward := -_camera.global_transform.basis.z
+	var space := _camera.get_world_3d().direct_space_state
+	var query := PhysicsRayQueryParameters3D.create(origin, origin + forward * dist)
+	query.collision_mask = 1
+	if _player:
+		query.exclude = [_player.get_rid()]
+	var hit := space.intersect_ray(query)
+	return (hit.get("position") as Vector3) if not hit.is_empty() else origin + forward * dist
+
+# === First-person viewmodel (sword / staff by class) ===
+
+## Build the class's viewmodel in front of the camera (viewmodel visual layer).
 func _build_viewmodel() -> void:
 	if _camera == null:
 		return
 	_sword = Node3D.new()
-	_sword.name = "SwordViewModel"
+	_sword.name = "ViewModel"
+	_camera.add_child(_sword)
+	var vm: String = "sword"
+	if _player:
+		vm = String(ClassDatabase.get_def(_player.class_id).get("viewmodel", "sword"))
+	if vm == "staff":
+		_build_staff()
+	else:
+		_build_sword()
+	_sword_rest = _sword.transform
+
+func _build_sword() -> void:
 	# Held two-handed, centred-low, blade up and angled across the view.
 	_sword.position = Vector3(0.12, -0.32, -0.55)
 	_sword.rotation = Vector3(deg_to_rad(-62.0), deg_to_rad(8.0), deg_to_rad(10.0))
-	_camera.add_child(_sword)
-	_sword_rest = _sword.transform
-
 	var steel := Color(0.74, 0.77, 0.82)
 	var dark := Color(0.13, 0.12, 0.14)
-	# Parts laid along local +Y (grip → guard → blade), origin at the hands.
 	_add_part(Vector3(0.05, 0.05, 0.05), Vector3(0.0, -0.16, 0.0), dark)        # pommel
 	_add_part(Vector3(0.045, 0.22, 0.045), Vector3(0.0, -0.02, 0.0), dark)       # grip
 	_add_part(Vector3(0.24, 0.045, 0.05), Vector3(0.0, 0.10, 0.0), steel)        # crossguard
 	_add_part(Vector3(0.05, 0.95, 0.018), Vector3(0.0, 0.60, 0.0), steel)        # blade
-	# Two hands gripping the hilt (two-handed hold).
 	var skin := Color(0.85, 0.68, 0.55)
 	_add_part(Vector3(0.07, 0.08, 0.07), Vector3(0.0, 0.02, 0.02), skin)
 	_add_part(Vector3(0.07, 0.08, 0.07), Vector3(0.0, -0.08, 0.02), skin)
+
+func _build_staff() -> void:
+	# A wooden shaft held two-handed, with a glowing orb at the top.
+	_sword.position = Vector3(0.18, -0.28, -0.6)
+	_sword.rotation = Vector3(deg_to_rad(-10.0), deg_to_rad(0.0), deg_to_rad(14.0))
+	var wood := Color(0.42, 0.29, 0.17)
+	_add_part(Vector3(0.05, 1.15, 0.05), Vector3(0.0, 0.2, 0.0), wood)           # shaft
+	var skin := Color(0.85, 0.68, 0.55)
+	_add_part(Vector3(0.07, 0.08, 0.07), Vector3(0.0, -0.18, 0.02), skin)
+	_add_part(Vector3(0.07, 0.08, 0.07), Vector3(0.0, -0.02, 0.02), skin)
+	# Glowing orb.
+	var orb := MeshInstance3D.new()
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.1
+	sphere.height = 0.2
+	orb.mesh = sphere
+	orb.position = Vector3(0.0, 0.82, 0.0)
+	orb.layers = PlayerController.VIEWMODEL_VISUAL_LAYER
+	var glow := StandardMaterial3D.new()
+	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	glow.albedo_color = Color(0.5, 0.8, 1.0)
+	glow.emission_enabled = true
+	glow.emission = Color(0.5, 0.8, 1.0)
+	orb.material_override = glow
+	_sword.add_child(orb)
 
 func _add_part(part_size: Vector3, offset: Vector3, color: Color) -> void:
 	var mesh := MeshInstance3D.new()
@@ -236,20 +388,31 @@ func _add_part(part_size: Vector3, offset: Vector3, color: Color) -> void:
 	mesh.material_override = mat
 	_sword.add_child(mesh)
 
-## A quick diagonal slash of the sword, returning to rest.
+## A quick diagonal slash (melee), returning to rest.
 func _swing() -> void:
 	if _sword == null:
 		return
 	if _swing_tween and _swing_tween.is_valid():
 		_swing_tween.kill()
 	_sword.transform = _sword_rest
-	# Wind up slightly, slash down-and-across, then ease back to rest.
 	var windup := _sword_rest.rotated_local(Vector3.RIGHT, deg_to_rad(25.0)).rotated_local(Vector3.FORWARD, deg_to_rad(-20.0))
 	var slash := _sword_rest.rotated_local(Vector3.RIGHT, deg_to_rad(-55.0)).rotated_local(Vector3.FORWARD, deg_to_rad(40.0))
 	_swing_tween = create_tween()
 	_swing_tween.tween_property(_sword, "transform", windup, 0.06)
 	_swing_tween.tween_property(_sword, "transform", slash, 0.08)
 	_swing_tween.tween_property(_sword, "transform", _sword_rest, 0.16)
+
+## A forward jab (spell cast), returning to rest.
+func _thrust() -> void:
+	if _sword == null:
+		return
+	if _swing_tween and _swing_tween.is_valid():
+		_swing_tween.kill()
+	_sword.transform = _sword_rest
+	var jab := _sword_rest.translated_local(Vector3(0.0, 0.0, -0.2))
+	_swing_tween = create_tween()
+	_swing_tween.tween_property(_sword, "transform", jab, 0.07)
+	_swing_tween.tween_property(_sword, "transform", _sword_rest, 0.14)
 
 # === Helpers ===
 
