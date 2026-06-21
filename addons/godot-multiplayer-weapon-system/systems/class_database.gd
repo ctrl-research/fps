@@ -26,7 +26,7 @@ static func class_ids() -> Array:
 	return _classes().keys()
 
 static func _classes() -> Dictionary:
-	return {"warrior": _warrior()}
+	return {"warrior": _warrior(), "mage": _mage()}
 
 # === Warrior (issue #80) ===
 
@@ -69,6 +69,52 @@ static func _warrior() -> Dictionary:
 					{"id": "leap_strike", "name": "Leap Strike", "desc": "Ability: leap gap-closer + AoE", "icon": "LEP", "grants": ["leap_strike"]},
 					{"id": "rampage", "name": "Rampage", "desc": "Kills reduce ability cooldowns", "icon": "CDR", "tags": ["rampage"], "values": {"cdr": 0.5}},
 					{"id": "berserk", "name": "Berserk", "desc": "CAPSTONE: ~6s of huge attack speed, lifesteal, spinning AoE", "icon": "★", "grants": ["berserk"]},
+				],
+			},
+		],
+	}
+
+# === Mage (issue #85) ===
+
+static func _mage() -> Dictionary:
+	return {
+		"id": "mage",
+		"name": "Mage",
+		"description": "Ranged spellcaster. A frail glass cannon — specialise into a Pyromancer or a Frost Warden.",
+		"model": "res://assets/characters/kaykit_adventurers/Mage.glb",
+		"viewmodel": "palm",
+		"base_abilities": ["magic_bolt", "blink"],
+		"passive": {
+			"name": "Arcane Focus",
+			"desc": "+10% spell damage and faster casts, but frail (-15% health)",
+			"icon": "ARC",
+			"stats": {"damage": 1.10, "fire_rate": 0.95, "health": 0.85},
+		},
+		"paths": [
+			{
+				"name": "Pyromancer",
+				"nodes": [
+					{"id": "kindling", "name": "Kindling", "desc": "+12% spell damage", "icon": "DMG", "stats": {"damage": 1.12}},
+					{"id": "quick_cast", "name": "Quick Cast", "desc": "+15% cast speed", "icon": "CST", "stats": {"fire_rate": 0.85}},
+					{"id": "spell_siphon", "name": "Spell Siphon", "desc": "Spells heal you (lifesteal)", "icon": "LS", "tags": ["lifesteal"], "values": {"lifesteal": 0.12}},
+					{"id": "pyromania", "name": "Pyromania", "desc": "+20% spell damage", "icon": "DM+", "stats": {"damage": 1.20}},
+					{"id": "combustion", "name": "Combustion", "desc": "Kills reduce ability cooldowns", "icon": "CDR", "tags": ["rampage"], "values": {"cdr": 0.5}},
+					{"id": "fireball", "name": "Fireball", "desc": "Ability: a projectile that bursts for AoE", "icon": "FBL", "grants": ["fireball"]},
+					{"id": "immolation", "name": "Immolation", "desc": "+15% spell damage", "icon": "DM2", "stats": {"damage": 1.15}},
+					{"id": "meteor", "name": "Meteor", "desc": "CAPSTONE: heavy AoE at the aim point after a short delay", "icon": "★", "grants": ["meteor"]},
+				],
+			},
+			{
+				"name": "Frost Warden",
+				"nodes": [
+					{"id": "frostbite", "name": "Frostbite", "desc": "Your spells slow enemies", "icon": "SLW", "tags": ["stagger"], "values": {"slow": 0.35, "time": 1.5}},
+					{"id": "ice_armor", "name": "Ice Armor", "desc": "-15% damage taken while stationary", "icon": "DEF", "tags": ["bracing"], "values": {"reduction": 0.15}},
+					{"id": "mana_font", "name": "Mana Font", "desc": "Regenerate health out of combat", "icon": "REG", "tags": ["regen"], "values": {"per_sec": 5.0}},
+					{"id": "glacial", "name": "Glacial", "desc": "+12% spell damage", "icon": "DMG", "stats": {"damage": 1.12}},
+					{"id": "ward", "name": "Ward", "desc": "-20% damage taken", "icon": "DR", "stats": {"damage_taken": 0.80}},
+					{"id": "frost_nova", "name": "Frost Nova", "desc": "Ability: AoE around you that damages and slows", "icon": "NVA", "grants": ["frost_nova"]},
+					{"id": "hardened", "name": "Hardened", "desc": "+18% max health", "icon": "HP", "stats": {"health": 1.18}},
+					{"id": "blizzard", "name": "Blizzard", "desc": "CAPSTONE: strong AoE damage and heavy slow at the aim point", "icon": "★", "grants": ["blizzard"]},
 				],
 			},
 		],
