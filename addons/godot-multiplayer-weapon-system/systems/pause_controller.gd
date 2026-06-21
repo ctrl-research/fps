@@ -27,14 +27,26 @@ var on_escape: Callable = Callable()
 ## What "Leave to Menu" does; defaults to changing to the main scene.
 var leave_action: Callable = Callable()
 
+## How long to keep re-requesting pointer lock after a resume (web browsers
+## enforce a ~1s cooldown after Esc, so an immediate request silently fails).
+const CAPTURE_RETRY_TIME: float = 2.0
+
 var _pause_menu: PauseMenu = null
 var _was_captured: bool = false
+var _capture_retry: float = 0.0
 
-func _process(_delta: float) -> void:
-	# Web: a CAPTURED->VISIBLE transition with no menu open means Esc was pressed
-	# (the browser ate the key). Treat it as a pause request.
+func _process(delta: float) -> void:
 	var captured := Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED
-	if _was_captured and not captured and not is_paused() and not _blocked():
+	if _capture_retry > 0.0 and not is_paused():
+		# Resuming: keep asking for pointer lock until it engages (web cooldown).
+		if captured:
+			_capture_retry = 0.0
+		else:
+			Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+			_capture_retry -= delta
+	elif _was_captured and not captured and not is_paused() and not _blocked():
+		# A CAPTURED->VISIBLE transition with no menu open means Esc was pressed
+		# (the browser ate the key). Treat it as a pause request.
 		_open()
 	_was_captured = captured
 
@@ -55,9 +67,14 @@ func is_paused() -> bool:
 func toggle() -> void:
 	if is_paused():
 		_pause_menu.queue_free()
-		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+		_request_capture()
 	else:
 		_open()
+
+## Re-acquire pointer lock, retrying past the browser's post-Esc cooldown.
+func _request_capture() -> void:
+	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+	_capture_retry = CAPTURE_RETRY_TIME
 
 func _blocked() -> bool:
 	return is_blocked.is_valid() and bool(is_blocked.call())
@@ -65,7 +82,7 @@ func _blocked() -> bool:
 func _open() -> void:
 	_pause_menu = PauseMenu.new()
 	add_child(_pause_menu)
-	_pause_menu.resumed.connect(func() -> void: Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED))
+	_pause_menu.resumed.connect(_request_capture)
 	_pause_menu.leave_requested.connect(_leave)
 
 func _leave() -> void:
