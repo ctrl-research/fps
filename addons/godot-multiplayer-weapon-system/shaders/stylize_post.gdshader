@@ -92,7 +92,7 @@ float fbm(vec2 p) {
 	return v;
 }
 
-vec3 compute_sky(vec3 dir) {
+vec3 compute_sky(vec3 dir, float t) {
 	float up = clamp(dir.y, 0.0, 1.0);
 	vec3 day_top = vec3(0.20, 0.42, 0.82);
 	vec3 day_hor = vec3(0.70, 0.80, 0.95);
@@ -111,7 +111,7 @@ vec3 compute_sky(vec3 dir) {
 	col += vec3(1.0, 0.9, 0.7) * pow(max(sd, 0.0), 48.0) * 0.4 * sky_day;
 
 	if (dir.y > 0.02) {
-		vec2 uv = dir.xz / (dir.y + 0.2) * 1.2 + TIME * 0.006;
+		vec2 uv = dir.xz / (dir.y + 0.2) * 1.2 + t * 0.006;
 		float c = smoothstep(0.45, 0.85, fbm(uv)) * smoothstep(0.02, 0.25, dir.y);
 		vec3 cloud = mix(vec3(0.08, 0.09, 0.13), vec3(1.0), sky_day);
 		cloud = mix(cloud, sunset, sky_sunset * 0.5);
@@ -130,7 +130,7 @@ void fragment() {
 	vec3 src = texture(screen_tex, SCREEN_UV).rgb;
 	// Sentinel background = sky: reconstruct it un-stylised.
 	if (sky_enabled && distance(src, sky_sentinel) < 0.15) {
-		COLOR = vec4(compute_sky(ray_from_uv(SCREEN_UV)), 1.0);
+		COLOR = vec4(compute_sky(ray_from_uv(SCREEN_UV), TIME), 1.0);
 		return;
 	}
 	vec3 col = (color_mode == 0) ? classic_posterize(src) : realistic_grade(src);
