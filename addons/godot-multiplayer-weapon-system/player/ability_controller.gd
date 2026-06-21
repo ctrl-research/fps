@@ -388,9 +388,9 @@ func _build_viewmodel() -> void:
 	_sword_rest = _sword.transform
 
 func _build_sword() -> void:
-	# Held in the lower-right, blade pointing vertically (slight natural tilt).
+	# Held in the lower-right, blade pointing straight up.
 	_sword.position = Vector3(0.32, -0.42, -0.55)
-	_sword.rotation = Vector3(deg_to_rad(-6.0), deg_to_rad(6.0), deg_to_rad(8.0))
+	_sword.rotation = Vector3(deg_to_rad(-2.0), deg_to_rad(0.0), deg_to_rad(3.0))
 	var steel := Color(0.74, 0.77, 0.82)
 	var dark := Color(0.13, 0.12, 0.14)
 	_add_part(Vector3(0.05, 0.05, 0.05), Vector3(0.0, -0.16, 0.0), dark)        # pommel
@@ -459,19 +459,20 @@ func _add_part(part_size: Vector3, offset: Vector3, color: Color, rot_deg: Vecto
 	mesh.material_override = mat
 	_sword.add_child(mesh)
 
-## A quick diagonal slash (melee), returning to rest.
+## A wide horizontal slash: wind up to the right, sweep across to the left.
 func _swing() -> void:
 	if _sword == null:
 		return
 	if _swing_tween and _swing_tween.is_valid():
 		_swing_tween.kill()
 	_sword.transform = _sword_rest
-	var windup := _sword_rest.rotated_local(Vector3.RIGHT, deg_to_rad(25.0)).rotated_local(Vector3.FORWARD, deg_to_rad(-20.0))
-	var slash := _sword_rest.rotated_local(Vector3.RIGHT, deg_to_rad(-55.0)).rotated_local(Vector3.FORWARD, deg_to_rad(40.0))
+	# Roll about the blade's forward axis so the tip arcs across the view.
+	var windup := _sword_rest.rotated_local(Vector3.FORWARD, deg_to_rad(60.0))    # cocked right
+	var slash := _sword_rest.rotated_local(Vector3.FORWARD, deg_to_rad(-90.0))    # swept left
 	_swing_tween = create_tween()
-	_swing_tween.tween_property(_sword, "transform", windup, 0.06)
-	_swing_tween.tween_property(_sword, "transform", slash, 0.08)
-	_swing_tween.tween_property(_sword, "transform", _sword_rest, 0.16)
+	_swing_tween.tween_property(_sword, "transform", windup, 0.08)
+	_swing_tween.tween_property(_sword, "transform", slash, 0.10)
+	_swing_tween.tween_property(_sword, "transform", _sword_rest, 0.18)
 
 ## A forward jab (spell cast), returning to rest.
 func _thrust() -> void:
