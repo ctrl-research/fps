@@ -52,6 +52,9 @@ var _last_attacker_id: int = 0
 var _tracer: MeshInstance3D = null
 var _model: CharacterModel = null
 var _prev_anim_pos: Vector3 = Vector3.ZERO
+var _stun_time: float = 0.0
+var _slow_factor: float = 1.0
+var _slow_time: float = 0.0
 
 ## Bot character model (KayKit Skeleton Warrior).
 const BOT_MODEL: String = "res://assets/characters/kaykit_skeletons/Skeleton_Warrior.glb"
@@ -94,6 +97,15 @@ func _physics_process(delta: float) -> void:
 	velocity.z = 0.0
 	move_and_slide()
 
+	if _slow_time > 0.0:
+		_slow_time -= delta
+		if _slow_time <= 0.0:
+			_slow_factor = 1.0
+	if _stun_time > 0.0:
+		# Stunned (e.g. Shield Bash): no aiming or firing.
+		_stun_time -= delta
+		return
+
 	if _model != null:
 		var moved := global_position - _prev_anim_pos
 		_prev_anim_pos = global_position
@@ -104,7 +116,7 @@ func _physics_process(delta: float) -> void:
 		_face(target)
 		_fire_timer -= delta
 		if _fire_timer <= 0.0:
-			_fire_timer = FIRE_INTERVAL * stat_fire_rate_mult
+			_fire_timer = FIRE_INTERVAL * stat_fire_rate_mult * _slow_factor
 			_shoot_at(target)
 
 	if _flash_timer > 0.0:
@@ -167,6 +179,15 @@ func reset_for_round() -> void:
 
 func is_alive() -> bool:
 	return not _dead
+
+## Stunned: no aiming/firing for `seconds` (Warrior Shield Bash).
+func apply_stun(seconds: float) -> void:
+	_stun_time = maxf(_stun_time, seconds)
+
+## Slowed: fire interval scaled by `factor` (>1 = slower) for `seconds` (Stagger).
+func apply_slow(factor: float, seconds: float) -> void:
+	_slow_factor = factor
+	_slow_time = maxf(_slow_time, seconds)
 
 ## Nearest living player with a clear line of sight, at any range (bots ignore
 ## downed/dead targets and each other).

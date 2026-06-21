@@ -119,6 +119,15 @@ var stat_damage_mult: float = 1.0
 var stat_fire_rate_mult: float = 1.0
 var stat_damage_taken_mult: float = 1.0
 
+# Warrior ability state (timers in seconds; mults 1.0 = none).
+var _spec_tags: Dictionary = {}
+var _time_since_damage: float = 999.0
+var _temp_speed_mult: float = 1.0
+var _temp_speed_time: float = 0.0
+var _temp_dr_mult: float = 1.0
+var _temp_dr_time: float = 0.0
+var _stun_time: float = 0.0
+
 func _ready() -> void:
 	health = max_health
 
@@ -202,9 +211,53 @@ func character_model() -> CharacterModel:
 ## Apply a spec allocation: stat multipliers + the ability kit it grants.
 func apply_spec(spec: SpecTree) -> void:
 	_spec_tree = spec
+	_spec_tags = spec.tags()
 	apply_stats(spec.aggregate_stats())
 	if _ability_controller:
-		_ability_controller.configure(spec.granted_abilities(), spec.tags())
+		_ability_controller.configure(spec.granted_abilities(), _spec_tags)
+
+func is_stunned() -> bool:
+	return _stun_time > 0.0
+
+func apply_stun(seconds: float) -> void:
+	_stun_time = maxf(_stun_time, seconds)
+
+## A temporary move-speed multiplier (Momentum: speed burst after a kill).
+func apply_speed_burst(mult: float, seconds: float) -> void:
+	_temp_speed_mult = mult
+	_temp_speed_time = maxf(_temp_speed_time, seconds)
+
+## A temporary incoming-damage multiplier (Immovable capstone: <1 = reduction).
+func apply_defensive_window(dr_mult: float, seconds: float) -> void:
+	_temp_dr_mult = dr_mult
+	_temp_dr_time = maxf(_temp_dr_time, seconds)
+
+## Tick ability timers + Second Wind regen (called each authoritative frame).
+func _tick_ability_timers(delta: float) -> void:
+	_time_since_damage += delta
+	if _temp_speed_time > 0.0:
+		_temp_speed_time -= delta
+		if _temp_speed_time <= 0.0:
+			_temp_speed_mult = 1.0
+	if _temp_dr_time > 0.0:
+		_temp_dr_time -= delta
+		if _temp_dr_time <= 0.0:
+			_temp_dr_mult = 1.0
+	if _stun_time > 0.0:
+		_stun_time -= delta
+	if _spec_tags.has("regen") and _time_since_damage > 3.0 and health < max_health:
+		heal(float(_spec_tags["regen"].get("per_sec", 0.0)) * delta)
+
+## Frozen-in-place physics while stunned (gravity only).
+func _frozen_physics(delta: float) -> void:
+	velocity.x = 0.0
+	velocity.z = 0.0
+	if not is_on_floor():
+		_velocity_y -= GRAVITY * delta
+	else:
+		_velocity_y = 0.0
+	velocity.y = _velocity_y
+	move_and_slide()
 
 ## Apply Evolution stat multipliers ({health, speed, damage, fire_rate}) and
 ## refill to the new max. Called at the start of each round.
@@ -278,6 +331,12 @@ func _physics_process(delta: float) -> void:
 
 	if is_downed:
 		_process_downed(delta)
+		_update_animation(delta)
+		return
+
+	_tick_ability_timers(delta)
+	if _stun_time > 0.0:
+		_frozen_physics(delta)
 		_update_animation(delta)
 		return
 
@@ -368,7 +427,7 @@ func _handle_movement(delta: float) -> void:
 		_current_speed = SPRINT_SPEED
 	else:
 		_current_speed = WALK_SPEED
-	_current_speed *= stat_speed_mult
+	_current_speed *= stat_speed_mult * _temp_speed_mult
 
 	# Gravity
 	if not is_on_floor():
@@ -490,7 +549,13 @@ func _apply_damage(amount: float, attacker_id: int) -> void:
 	if is_dead or is_downed or amount <= 0.0:
 		return
 	_last_attacker_id = attacker_id
-	health = max(health - amount * stat_damage_taken_mult, 0.0)
+	_time_since_damage = 0.0
+	var taken := amount * stat_damage_taken_mult
+	if _temp_dr_time > 0.0:
+		taken *= _temp_dr_mult  # Immovable capstone window
+	if _spec_tags.has("bracing") and Vector2(velocity.x, velocity.z).length() < 0.5:
+		taken *= 1.0 - float(_spec_tags["bracing"].get("reduction", 0.0))
+	health = max(health - taken, 0.0)
 	health_changed.emit(health, max_health)
 	_broadcast_health()
 	if health <= 0.0:
