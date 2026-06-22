@@ -434,10 +434,10 @@ func _build_viewmodel() -> void:
 	_sword_rest = _sword.transform
 
 func _build_sword() -> void:
-	# Held diagonally in the lower-right: blade axis ~60° above horizontal (30°
-	# roll), with the tip tilted slightly toward the camera.
-	_sword.position = Vector3(0.22, -0.46, -0.55)
-	_sword.rotation = Vector3(deg_to_rad(12.0), deg_to_rad(0.0), deg_to_rad(-30.0))
+	# Held in the lower-right: blade axis ~80° above horizontal (10° roll), with the
+	# tip tilted slightly toward the camera.
+	_sword.position = Vector3(0.28, -0.46, -0.55)
+	_sword.rotation = Vector3(deg_to_rad(12.0), deg_to_rad(0.0), deg_to_rad(-10.0))
 	var steel := Color(0.74, 0.77, 0.82)
 	var dark := Color(0.13, 0.12, 0.14)
 	_add_part(Vector3(0.05, 0.05, 0.05), Vector3(0.0, -0.16, 0.0), dark)        # pommel
@@ -468,22 +468,29 @@ func _build_swing_arc() -> void:
 	_arc.visible = false
 	_camera.add_child(_arc)
 
-## A crescent ribbon in the XY plane (a thin arc), built once and reused.
+## A crescent-moon shape in the XY plane (centred on +Y): a ribbon along an arc,
+## tapered to points at both ends and fattest in the middle. Built once, reused.
 func _make_arc_mesh() -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var segments := 18
-	var a0 := deg_to_rad(-75.0)
-	var a1 := deg_to_rad(75.0)
-	var r_in := 0.42
-	var r_out := 0.72
+	var segments := 22
+	var a0 := deg_to_rad(48.0)    # spans 48°..132°, centred on 90° (+Y / up)
+	var a1 := deg_to_rad(132.0)
+	var r_mid := 0.6
+	var width := 0.17
 	for i in segments:
-		var ang0 := lerpf(a0, a1, float(i) / float(segments))
-		var ang1 := lerpf(a0, a1, float(i + 1) / float(segments))
-		var i0 := Vector3(cos(ang0), sin(ang0), 0.0) * r_in
-		var o0 := Vector3(cos(ang0), sin(ang0), 0.0) * r_out
-		var i1 := Vector3(cos(ang1), sin(ang1), 0.0) * r_in
-		var o1 := Vector3(cos(ang1), sin(ang1), 0.0) * r_out
+		var t0 := float(i) / float(segments)
+		var t1 := float(i + 1) / float(segments)
+		var ang0 := lerpf(a0, a1, t0)
+		var ang1 := lerpf(a0, a1, t1)
+		var w0 := width * sin(t0 * PI)     # 0 at the tips, max in the middle
+		var w1 := width * sin(t1 * PI)
+		var d0 := Vector3(cos(ang0), sin(ang0), 0.0)
+		var d1 := Vector3(cos(ang1), sin(ang1), 0.0)
+		var i0 := d0 * (r_mid - w0)
+		var o0 := d0 * (r_mid + w0)
+		var i1 := d1 * (r_mid - w1)
+		var o1 := d1 * (r_mid + w1)
 		st.add_vertex(i0)
 		st.add_vertex(o0)
 		st.add_vertex(o1)
@@ -566,31 +573,33 @@ func _swing() -> void:
 	if _swing_tween and _swing_tween.is_valid():
 		_swing_tween.kill()
 	_sword.transform = _sword_rest
-	# Alternate the sweep each swing: right->left, then left->right.
+	# Horizontal sweep across the screen, alternating each swing: the blade rolls
+	# from one side (windup) to the other (slash). _swing_dir flips it right<->left.
 	var d := _swing_dir
-	var windup := _sword_rest.rotated_local(Vector3.RIGHT, deg_to_rad(20.0)).rotated_local(Vector3.FORWARD, deg_to_rad(30.0 * d))
-	var slash := _sword_rest.rotated_local(Vector3.RIGHT, deg_to_rad(-65.0)).rotated_local(Vector3.FORWARD, deg_to_rad(-50.0 * d))
+	var windup := _sword_rest.rotated_local(Vector3.RIGHT, deg_to_rad(10.0)).rotated_local(Vector3.FORWARD, deg_to_rad(80.0 * d))
+	var slash := _sword_rest.rotated_local(Vector3.RIGHT, deg_to_rad(-15.0)).rotated_local(Vector3.FORWARD, deg_to_rad(-80.0 * d))
 	_swing_tween = create_tween()
-	_swing_tween.tween_property(_sword, "transform", windup, 0.07)
-	_swing_tween.tween_property(_sword, "transform", slash, 0.10)
+	_swing_tween.tween_property(_sword, "transform", windup, 0.08)
+	_swing_tween.tween_property(_sword, "transform", slash, 0.11)
 	_swing_tween.tween_property(_sword, "transform", _sword_rest, 0.18)
 	_flash_arc(d)
 	_swing_dir = -_swing_dir
 
-## Flash the slash arc, mirrored to match the swing direction, then fade it out.
+## Sweep the crescent arc along the blade's path (in the attack direction) and
+## fade it out, matching the swing direction.
 func _flash_arc(d: float) -> void:
 	if _arc == null:
 		return
 	if _arc_tween and _arc_tween.is_valid():
 		_arc_tween.kill()
-	# Orient the crescent diagonally along the swing, flipped per direction.
-	_arc.rotation = Vector3(0.0, 0.0, deg_to_rad(-35.0 * d))
-	_arc.scale = Vector3(d, 1.0, 1.0)
-	_arc_mat.albedo_color = Color(1.0, 1.0, 1.0, 0.55)
+	# Start cocked to one side, sweep to the other (same direction as the swing).
+	_arc.rotation = Vector3(0.0, 0.0, deg_to_rad(-60.0 * d))
+	_arc_mat.albedo_color = Color(1.0, 1.0, 1.0, 0.6)
 	_arc.visible = true
-	_arc_tween = create_tween()
-	_arc_tween.tween_property(_arc_mat, "albedo_color", Color(1.0, 1.0, 1.0, 0.0), 0.22)
-	_arc_tween.tween_callback(func() -> void: _arc.visible = false)
+	_arc_tween = create_tween().set_parallel(true)
+	_arc_tween.tween_property(_arc, "rotation:z", deg_to_rad(60.0 * d), 0.2)
+	_arc_tween.tween_property(_arc_mat, "albedo_color", Color(1.0, 1.0, 1.0, 0.0), 0.24)
+	_arc_tween.chain().tween_callback(func() -> void: _arc.visible = false)
 
 ## A forward jab (spell cast), returning to rest.
 func _thrust() -> void:
