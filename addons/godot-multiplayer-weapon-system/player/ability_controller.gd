@@ -448,6 +448,9 @@ func _build_palm() -> void:
 	glow.albedo_color = Color(1.0, 0.55, 0.2)
 	glow.emission_enabled = true
 	glow.emission = Color(1.0, 0.45, 0.15)
+	# On top of the world like the rest of the viewmodel.
+	glow.no_depth_test = true
+	glow.render_priority = 1
 	_orb.material_override = glow
 	_sword.add_child(_orb)
 	# Gentle hover bob.
@@ -479,6 +482,11 @@ func _add_part(part_size: Vector3, offset: Vector3, color: Color, rot_deg: Vecto
 	mat.albedo_color = color
 	mat.metallic = 0.3
 	mat.roughness = 0.5
+	# Render the viewmodel on top of the world (never clipped by walls) while
+	# keeping it in the main frame so the dither post-process still shades it.
+	# no_depth_test moves it to the transparent pass, drawn after world geometry.
+	mat.no_depth_test = true
+	mat.render_priority = 1
 	mesh.material_override = mat
 	_sword.add_child(mesh)
 
