@@ -12,10 +12,6 @@ their match progress.
 Reusable: add as a child of a scene and call apply() (defaults to day at _ready).
 """
 
-# Background colour used while the comic shader is on, so PostProcess can detect
-# sky pixels and draw the (un-stylised) sky there. Must not occur on geometry.
-const SENTINEL: Color = Color(1.0, 0.0, 1.0)
-
 const SKY_SHADER: String = """
 shader_type sky;
 
@@ -86,8 +82,6 @@ void sky() {
 var _env: WorldEnvironment = null
 var _sun: DirectionalLight3D = null
 var _sky_mat: ShaderMaterial = null
-var _cur_day: float = 1.0
-var _cur_sunset: float = 0.0
 
 func _ready() -> void:
 	_sky_mat = ShaderMaterial.new()
@@ -110,29 +104,7 @@ func _ready() -> void:
 	_sun = DirectionalLight3D.new()
 	add_child(_sun)
 
-	_apply_background()
-	Settings.settings_changed.connect(_apply_background)
 	apply(0.0)
-
-func _process(_delta: float) -> void:
-	# Push the sky params every frame so the post-process sky reconstruction can
-	# never be left disabled by a timing window, and tracks the sun smoothly.
-	if _sun and Settings.stylize_enabled:
-		PostProcess.set_sky(-_sun.global_transform.basis.z, _cur_day, _cur_sunset)
-
-func _exit_tree() -> void:
-	PostProcess.clear_sky()
-
-## With the comic shader on, clear to a sentinel colour so the post-process draws
-## the (un-stylised) sky; with it off, use the real engine sky.
-func _apply_background() -> void:
-	if _env == null:
-		return
-	if Settings.stylize_enabled:
-		_env.environment.background_mode = Environment.BG_COLOR
-		_env.environment.background_color = SENTINEL
-	else:
-		_env.environment.background_mode = Environment.BG_SKY
 
 ## Set the time of day from match progress (0 day → 0.5 sunset → 1 night).
 func apply(progress: float) -> void:
@@ -143,8 +115,6 @@ func apply(progress: float) -> void:
 		_sun.rotation_degrees = Vector3(pitch, lerpf(-40.0, 40.0, progress), 0.0)
 		var day := clampf(1.0 - progress, 0.05, 1.0)
 		var sunset := clampf(1.0 - absf(progress - 0.5) * 2.0, 0.0, 1.0)
-		_cur_day = day
-		_cur_sunset = sunset
 		_sun.light_energy = day * 1.1 + 0.05
 		var col := Color(1.0, 0.97, 0.9).lerp(Color(0.45, 0.5, 0.75), progress)
 		_sun.light_color = col.lerp(Color(1.0, 0.55, 0.25), sunset * 0.7)
@@ -152,5 +122,3 @@ func apply(progress: float) -> void:
 		_env.environment.ambient_light_color = Color(0.35, 0.37, 0.5).lerp(Color(0.6, 0.65, 0.75), day)
 		_sky_mat.set_shader_parameter("day_factor", day)
 		_sky_mat.set_shader_parameter("sunset_factor", sunset)
-		# Drive the post-process sky reconstruction (comic-on path).
-		PostProcess.set_sky(-_sun.global_transform.basis.z, day, sunset)
