@@ -35,6 +35,7 @@ func _ready() -> void:
 	_build_buildings()
 	_build_cover()
 	_build_decoration()
+	_build_torches()
 
 # === Spawns ===
 
@@ -105,6 +106,45 @@ func _build_decoration() -> void:
 	# Torches up on the central platform; a chest at dead centre.
 	_sym_prop("torch", Vector3(7.0, 2.0, 7.0), 0.0, Vector3.ZERO)
 	_prop("chest", Vector3(0.0, 2.0, 0.0), 0.0, Vector3(1.2, 1.0, 0.8))
+
+# === Torches (warm point lights spread across the arena) ===
+
+## Warm point lights + a glowing flame, placed symmetrically so they create pools
+## of light with dark gaps between — the contrast the dither shading reads from.
+func _build_torches() -> void:
+	_sym_torch(Vector3(30.0, 3.5, 18.0))   # side walls, four quadrants
+	_sym_torch(Vector3(30.0, 3.5, -18.0))
+	_sym_torch(Vector3(7.0, 3.2, 7.0))     # central platform (by the torch props)
+	_sym_torch(Vector3(0.0, 3.5, 38.0))    # near each spawn end
+
+func _torch(pos: Vector3) -> void:
+	var light := OmniLight3D.new()
+	light.position = pos
+	light.light_color = Color(1.0, 0.62, 0.30)
+	light.omni_range = 24.0
+	light.light_energy = 4.0
+	light.shadow_enabled = false
+	# Don't touch the viewmodel — it has its own dedicated light.
+	light.light_cull_mask &= ~PlayerController.VIEWMODEL_VISUAL_LAYER
+	add_child(light)
+	# Visible flame at the source.
+	var flame := MeshInstance3D.new()
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.18
+	sphere.height = 0.36
+	flame.mesh = sphere
+	flame.position = pos
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(1.0, 0.72, 0.32)
+	mat.emission_enabled = true
+	mat.emission = Color(1.0, 0.55, 0.2)
+	flame.material_override = mat
+	add_child(flame)
+
+func _sym_torch(pos: Vector3) -> void:
+	_torch(pos)
+	_torch(_mirror(pos))
 
 # === Builders ===
 
