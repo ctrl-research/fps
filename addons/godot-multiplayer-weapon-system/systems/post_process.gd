@@ -45,9 +45,13 @@ func _process(_delta: float) -> void:
 	var cam := get_viewport().get_camera_3d()
 	if _rect != null:
 		_rect.visible = Settings.stylize_enabled and cam != null
-	# Feed the camera ray basis so the shader can reconstruct the sky per pixel.
+	# Feed the camera ray basis (as three vec3 columns) so the shader can
+	# reconstruct the sky per pixel.
 	if _material != null and cam != null:
-		_material.set_shader_parameter("cam_basis", cam.global_transform.basis)
+		var b := cam.global_transform.basis
+		_material.set_shader_parameter("cam_basis_x", b.x)
+		_material.set_shader_parameter("cam_basis_y", b.y)
+		_material.set_shader_parameter("cam_basis_z", b.z)
 		_material.set_shader_parameter("cam_tan", tan(deg_to_rad(cam.fov) * 0.5))
 		var sz := get_viewport().get_visible_rect().size
 		_material.set_shader_parameter("cam_aspect", sz.x / maxf(sz.y, 1.0))
