@@ -20,11 +20,12 @@ const DEFAULT_MASTER_VOLUME: float = 0.75
 const CROSSHAIR_STYLES: Array[String] = ["Cross", "Dot", "Circle", "X", "Star"]
 
 ## Dither two-tone shading defaults (live-tunable in Settings).
-const DEFAULT_DITHER_SHADE: float = 0.40     # brightness of the shadow tone
-const DEFAULT_DITHER_LOW: float = 0.12       # luma where shadow ends
-const DEFAULT_DITHER_HIGH: float = 0.45      # luma where full light begins
+const DEFAULT_DITHER_SHADE: float = 0.30     # brightness of the shadow tone
+const DEFAULT_DITHER_LOW: float = 0.06       # luma where shadow ends
+const DEFAULT_DITHER_HIGH: float = 0.20      # luma where full light begins
 const DEFAULT_DITHER_GRAIN: float = 2.0      # dither grain size in pixels
-const DEFAULT_DITHER_CONTRAST: float = 1.0   # luminance contrast before banding
+const DEFAULT_DITHER_CONTRAST: float = 3.0   # luminance contrast before banding
+const MAX_DITHER_CONTRAST: float = 4.0
 
 ## Actions exposed in the rebinding UI, in display order.
 const BINDABLE_ACTIONS: Array[String] = [
@@ -152,7 +153,7 @@ func set_dither_grain(value: float) -> void:
 	settings_changed.emit()
 
 func set_dither_contrast(value: float) -> void:
-	dither_contrast = clampf(value, 0.5, 3.0)
+	dither_contrast = clampf(value, 0.5, MAX_DITHER_CONTRAST)
 	save()
 	settings_changed.emit()
 

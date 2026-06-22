@@ -8,21 +8,22 @@ shader_type canvas_item;
 
 uniform sampler2D screen_tex : hint_screen_texture, filter_linear;
 
-uniform float shade_strength : hint_range(0.0, 1.0) = 0.40;  // brightness of the shadow tone
-uniform float shadow_low : hint_range(0.0, 1.0) = 0.12;      // below this = solid shade
-uniform float shadow_high : hint_range(0.0, 1.0) = 0.45;     // above this = solid lit colour
+uniform float shade_strength : hint_range(0.0, 1.0) = 0.30;  // brightness of the shadow tone
+uniform float shadow_low : hint_range(0.0, 1.0) = 0.06;      // below this = solid shade
+uniform float shadow_high : hint_range(0.0, 1.0) = 0.20;     // above this = solid lit colour
 uniform float grain_size : hint_range(1.0, 6.0) = 2.0;       // dither grain size in pixels
-uniform float light_contrast : hint_range(0.5, 3.0) = 1.0;   // pushes surfaces toward two tones
+uniform float light_contrast : hint_range(0.5, 4.0) = 3.0;   // pushes surfaces toward two tones
 
 float luma(vec3 c) {
 	return dot(c, vec3(0.299, 0.587, 0.114));
 }
 
-// Static screen-space hash noise -> per-pixel dither threshold.
+// High-quality hash (Dave Hoskins) — white-noise dither with no visible tiling,
+// even at fine grain.
 float hash(vec2 p) {
-	p = fract(p * vec2(123.34, 456.21));
-	p += dot(p, p + 45.32);
-	return fract(p.x * p.y);
+	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+	p3 += dot(p3, p3.yzx + 33.33);
+	return fract((p3.x + p3.y) * p3.z);
 }
 
 void fragment() {
