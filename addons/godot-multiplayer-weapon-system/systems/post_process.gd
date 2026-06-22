@@ -8,8 +8,7 @@ Owns a screen-filling ColorRect running the stipple shader (black halftone dots
 in shadows only) over the rendered 3D frame. The overlay sits on a low
 CanvasLayer — below the HUD/menus (layer >= 1) — so only the 3D world is
 stylised, and is shown only while a 3D camera is active (i.e. in gameplay, not
-the 2D main menu). Toggled by Settings.stylize_enabled. DayNightSky drives the
-sky-exclusion gradient via set_sky / clear_sky.
+the 2D main menu). Toggled by Settings.stylize_enabled.
 """
 
 const SHADER_PATH: String = "res://addons/godot-multiplayer-weapon-system/shaders/stylize_post.gdshader"
@@ -42,16 +41,3 @@ func _process(_delta: float) -> void:
 	var cam := get_viewport().get_camera_3d()
 	if _rect != null:
 		_rect.visible = Settings.stylize_enabled and cam != null
-
-## DayNightSky drives the sky-exclusion colours (day/sunset in 0..1).
-func set_sky(day: float, sunset: float) -> void:
-	if _material == null:
-		return
-	_material.set_shader_parameter("sky_enabled", true)
-	_material.set_shader_parameter("sky_day", day)
-	_material.set_shader_parameter("sky_sunset", sunset)
-
-## Disable sky exclusion (modes without a procedural sky).
-func clear_sky() -> void:
-	if _material:
-		_material.set_shader_parameter("sky_enabled", false)

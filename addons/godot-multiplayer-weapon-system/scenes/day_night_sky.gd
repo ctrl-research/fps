@@ -12,10 +12,6 @@ their match progress.
 Reusable: add as a child of a scene and call apply() (defaults to day at _ready).
 """
 
-# Background colour while the stipple effect is on, so PostProcess can detect sky
-# pixels and draw a smooth sky there. Must not occur on geometry.
-const SENTINEL: Color = Color(1.0, 0.0, 1.0)
-
 const SKY_SHADER: String = """
 shader_type sky;
 
@@ -108,23 +104,7 @@ func _ready() -> void:
 	_sun = DirectionalLight3D.new()
 	add_child(_sun)
 
-	_apply_background()
-	Settings.settings_changed.connect(_apply_background)
 	apply(0.0)
-
-func _exit_tree() -> void:
-	PostProcess.clear_sky()
-
-## With the stipple effect on, clear to a sentinel colour so PostProcess draws a
-## smooth (un-stippled) sky there; with it off, show the real engine sky.
-func _apply_background() -> void:
-	if _env == null:
-		return
-	if Settings.stylize_enabled:
-		_env.environment.background_mode = Environment.BG_COLOR
-		_env.environment.background_color = SENTINEL
-	else:
-		_env.environment.background_mode = Environment.BG_SKY
 
 ## Set the time of day from match progress (0 day → 0.5 sunset → 1 night).
 func apply(progress: float) -> void:
@@ -142,5 +122,3 @@ func apply(progress: float) -> void:
 		_env.environment.ambient_light_color = Color(0.35, 0.37, 0.5).lerp(Color(0.6, 0.65, 0.75), day)
 		_sky_mat.set_shader_parameter("day_factor", day)
 		_sky_mat.set_shader_parameter("sunset_factor", sunset)
-		# Drive the post-process sky-exclusion gradient (stipple-on path).
-		PostProcess.set_sky(day, sunset)
