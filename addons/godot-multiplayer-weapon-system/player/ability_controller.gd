@@ -411,9 +411,10 @@ func _build_viewmodel() -> void:
 	_sword_rest = _sword.transform
 
 func _build_sword() -> void:
-	# Held in the lower-right, blade pointing straight up.
-	_sword.position = Vector3(0.32, -0.42, -0.55)
-	_sword.rotation = Vector3(deg_to_rad(-2.0), deg_to_rad(0.0), deg_to_rad(3.0))
+	# Held diagonally in the lower-right: blade axis ~60° above horizontal (30°
+	# roll), with the tip tilted slightly toward the camera.
+	_sword.position = Vector3(0.22, -0.46, -0.55)
+	_sword.rotation = Vector3(deg_to_rad(12.0), deg_to_rad(0.0), deg_to_rad(-30.0))
 	var steel := Color(0.74, 0.77, 0.82)
 	var dark := Color(0.13, 0.12, 0.14)
 	_add_part(Vector3(0.05, 0.05, 0.05), Vector3(0.0, -0.16, 0.0), dark)        # pommel
