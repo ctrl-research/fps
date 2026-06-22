@@ -162,8 +162,10 @@ func _ready() -> void:
 		var vm_light := DirectionalLight3D.new()
 		vm_light.name = "ViewModelLight"
 		vm_light.light_cull_mask = VIEWMODEL_VISUAL_LAYER
-		vm_light.light_energy = 1.4
-		vm_light.rotation_degrees = Vector3(-35.0, 35.0, 0.0)
+		# Strong, steep key light so the viewmodel has a bright lit side and a deep
+		# shadow side — wide luminance spread means more of it lands in the dither.
+		vm_light.light_energy = 3.0
+		vm_light.rotation_degrees = Vector3(-50.0, 45.0, 0.0)
 		vm_light.shadow_enabled = false
 		_camera.add_child(vm_light)
 

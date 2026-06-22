@@ -110,8 +110,10 @@ func _build_ui() -> void:
 	stylize_check.toggled.connect(Settings.set_stylize_enabled)
 	stylize_row.add_child(stylize_check)
 
-	vbox.add_child(_make_slider_row("Shade darkness", 0.0, 1.0, 0.02,
+	vbox.add_child(_make_slider_row("Shadow brightness", 0.0, 1.0, 0.02,
 		Settings.dither_shade, Settings.set_dither_shade))
+	vbox.add_child(_make_slider_row("Lit brightness", 0.3, 1.2, 0.02,
+		Settings.dither_lit, Settings.set_dither_lit))
 	vbox.add_child(_make_slider_row("Shadow band start", 0.0, 1.0, 0.02,
 		Settings.dither_low, Settings.set_dither_low))
 	vbox.add_child(_make_slider_row("Shadow band end", 0.0, 1.0, 0.02,
