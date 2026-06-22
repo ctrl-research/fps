@@ -1,35 +1,39 @@
-// Stipple post-process — shades SHADOWS ONLY with black ink dots.
+// Dithered two-tone post-process (Mortal Sin-style).
 //
-// Lit surfaces keep their normal rendered colour; as a pixel falls below
-// shadow_cutoff luminance, black halftone dots grow denser. The dots are the
-// game's signature look, so they are sized to read clearly. No posterise, no
-// outline. Mounted below the HUD by PostProcess; shown only with a 3D camera.
+// Each surface is flattened toward two tones — its lit colour and a darker shade
+// colour — and the boundary between them is broken up by a screen-space noise
+// dither, giving the granular/grainy shadow look. Hue is preserved so team
+// colours (red/blue/yellow) stay readable. Mounted below the HUD by PostProcess;
+// shown only while a 3D camera is active.
 shader_type canvas_item;
 
 uniform sampler2D screen_tex : hint_screen_texture, filter_linear;
 
-uniform float dot_size : hint_range(2.0, 16.0) = 7.0;         // pixels per dot cell (bigger = bigger dots)
-uniform float shadow_cutoff : hint_range(0.1, 1.0) = 0.62;   // shade anything below this luminance
-uniform float dot_gain : hint_range(0.5, 2.0) = 1.25;        // max dot size in deep shadow
-uniform float dot_edge : hint_range(0.01, 0.3) = 0.08;       // dot edge softness (smaller = crisper)
+uniform float shade_strength : hint_range(0.0, 1.0) = 0.42;  // brightness of the shadow tone
+uniform float shadow_low : hint_range(0.0, 1.0) = 0.28;      // luma where shadow ends
+uniform float shadow_high : hint_range(0.0, 1.0) = 0.60;     // luma where full light begins
+uniform float grain_size : hint_range(1.0, 6.0) = 2.0;       // dither grain size in pixels
 
 float luma(vec3 c) {
 	return dot(c, vec3(0.299, 0.587, 0.114));
 }
 
-// Crisp black halftone dots sized by how deep in shadow the pixel is. Lit pixels
-// (luma >= shadow_cutoff) get no dots and keep their colour.
-vec3 stipple(vec3 c, vec2 px) {
-	float l = luma(c);
-	float shadow = 1.0 - smoothstep(shadow_cutoff * 0.5, shadow_cutoff, l);
-	vec2 f = fract(px / dot_size) - 0.5;
-	float dist = length(f) * 2.0;             // 0 at cell centre, ~1.41 at corner
-	float radius = shadow * dot_gain;
-	float dots = 1.0 - smoothstep(radius - dot_edge, radius + dot_edge, dist);
-	return mix(c, vec3(0.0), dots);           // black dots over the colour
+// Static screen-space hash noise -> per-pixel dither threshold.
+float hash(vec2 p) {
+	p = fract(p * vec2(123.34, 456.21));
+	p += dot(p, p + 45.32);
+	return fract(p.x * p.y);
 }
 
 void fragment() {
 	vec3 src = texture(screen_tex, SCREEN_UV).rgb;
-	COLOR = vec4(stipple(src, SCREEN_UV / SCREEN_PIXEL_SIZE), 1.0);
+	float l = luma(src);
+	// Lighting flattened toward two bands.
+	float shade_term = smoothstep(shadow_low, shadow_high, l);
+	// Granular dither boundary between the lit and shade tones.
+	vec2 cell = floor(SCREEN_UV / SCREEN_PIXEL_SIZE / grain_size);
+	float dith = hash(cell);
+	float lit = step(dith, shade_term);
+	vec3 shade_col = src * shade_strength;
+	COLOR = vec4(mix(shade_col, src, lit), 1.0);
 }
