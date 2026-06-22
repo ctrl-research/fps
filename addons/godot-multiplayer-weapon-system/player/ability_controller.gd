@@ -71,6 +71,10 @@ var _berserk_tick: float = 0.0
 var _sword: Node3D = null
 var _sword_rest: Transform3D = Transform3D.IDENTITY
 var _swing_tween: Tween = null
+var _swing_dir: float = 1.0            # alternates each swing (right<->left)
+var _arc: MeshInstance3D = null        # slash arc effect
+var _arc_mat: StandardMaterial3D = null
+var _arc_tween: Tween = null
 var _orb: MeshInstance3D = null      # mage palm fireball
 var _orb_tween: Tween = null
 
@@ -192,10 +196,29 @@ func _do_melee() -> void:
 	_swing()
 	if _player:
 		GameAudio.play_at(_player.global_position, "swing", "movement")
-	var collider := _hitscan(MELEE_RANGE)
-	if collider == null or not collider.has_method("request_damage"):
+	# A small-to-medium hitbox in front of the warrior — hits everything it
+	# overlaps, so clumped enemies all take the hit.
+	_melee_sweep(MELEE_DAMAGE * _damage_mult())
+
+## Damage every damageable body in a sphere just in front of the player.
+func _melee_sweep(damage: float) -> void:
+	if _player == null or _camera == null:
 		return
-	_apply_hit(collider, MELEE_DAMAGE * _damage_mult())
+	var forward := -_camera.global_transform.basis.z
+	var center := _player.global_position + forward * (MELEE_RANGE * 0.55)
+	center.y = _player.global_position.y
+	var space := _player.get_world_3d().direct_space_state
+	var shape := SphereShape3D.new()
+	shape.radius = MELEE_RANGE * 0.7
+	var params := PhysicsShapeQueryParameters3D.new()
+	params.shape = shape
+	params.transform = Transform3D(Basis(), center)
+	params.collision_mask = 1
+	params.exclude = [_player.get_rid()]
+	for result in space.intersect_shape(params, 16):
+		var collider = result.get("collider")
+		if collider and collider.has_method("request_damage"):
+			_apply_hit(collider, damage)
 
 ## Resolve a single melee hit: damage, hitmarker, and the lifesteal / rampage /
 ## stagger / momentum passives.
@@ -421,9 +444,53 @@ func _build_sword() -> void:
 	_add_part(Vector3(0.045, 0.22, 0.045), Vector3(0.0, -0.02, 0.0), dark)       # grip
 	_add_part(Vector3(0.24, 0.045, 0.05), Vector3(0.0, 0.10, 0.0), steel)        # crossguard
 	_add_part(Vector3(0.05, 0.95, 0.018), Vector3(0.0, 0.60, 0.0), steel)        # blade
+	# Both hands grip the handle: right hand on top (near the crossguard), left
+	# hand below it.
 	var skin := Color(0.85, 0.68, 0.55)
-	_add_part(Vector3(0.07, 0.08, 0.07), Vector3(0.0, 0.02, 0.02), skin)
-	_add_part(Vector3(0.07, 0.08, 0.07), Vector3(0.0, -0.08, 0.02), skin)
+	_add_part(Vector3(0.09, 0.085, 0.1), Vector3(0.0, 0.05, 0.02), skin)         # right hand (top)
+	_add_part(Vector3(0.09, 0.085, 0.1), Vector3(0.0, -0.06, 0.02), skin)        # left hand (bottom)
+	_build_swing_arc()
+
+## A translucent crescent that flashes along the blade's path on each swing.
+func _build_swing_arc() -> void:
+	_arc = MeshInstance3D.new()
+	_arc.mesh = _make_arc_mesh()
+	_arc.layers = PlayerController.VIEWMODEL_VISUAL_LAYER
+	_arc.position = Vector3(0.05, -0.05, -0.7)
+	_arc_mat = StandardMaterial3D.new()
+	_arc_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_arc_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_arc_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	_arc_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_arc_mat.no_depth_test = true
+	_arc_mat.albedo_color = Color(1.0, 1.0, 1.0, 0.0)
+	_arc.material_override = _arc_mat
+	_arc.visible = false
+	_camera.add_child(_arc)
+
+## A crescent ribbon in the XY plane (a thin arc), built once and reused.
+func _make_arc_mesh() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var segments := 18
+	var a0 := deg_to_rad(-75.0)
+	var a1 := deg_to_rad(75.0)
+	var r_in := 0.42
+	var r_out := 0.72
+	for i in segments:
+		var ang0 := lerpf(a0, a1, float(i) / float(segments))
+		var ang1 := lerpf(a0, a1, float(i + 1) / float(segments))
+		var i0 := Vector3(cos(ang0), sin(ang0), 0.0) * r_in
+		var o0 := Vector3(cos(ang0), sin(ang0), 0.0) * r_out
+		var i1 := Vector3(cos(ang1), sin(ang1), 0.0) * r_in
+		var o1 := Vector3(cos(ang1), sin(ang1), 0.0) * r_out
+		st.add_vertex(i0)
+		st.add_vertex(o0)
+		st.add_vertex(o1)
+		st.add_vertex(i0)
+		st.add_vertex(o1)
+		st.add_vertex(i1)
+	return st.commit()
 
 func _build_palm() -> void:
 	# Right hand held palm-up in the lower-right, with a fireball hovering above.
@@ -499,12 +566,31 @@ func _swing() -> void:
 	if _swing_tween and _swing_tween.is_valid():
 		_swing_tween.kill()
 	_sword.transform = _sword_rest
-	var windup := _sword_rest.rotated_local(Vector3.RIGHT, deg_to_rad(20.0)).rotated_local(Vector3.FORWARD, deg_to_rad(30.0))
-	var slash := _sword_rest.rotated_local(Vector3.RIGHT, deg_to_rad(-65.0)).rotated_local(Vector3.FORWARD, deg_to_rad(-50.0))
+	# Alternate the sweep each swing: right->left, then left->right.
+	var d := _swing_dir
+	var windup := _sword_rest.rotated_local(Vector3.RIGHT, deg_to_rad(20.0)).rotated_local(Vector3.FORWARD, deg_to_rad(30.0 * d))
+	var slash := _sword_rest.rotated_local(Vector3.RIGHT, deg_to_rad(-65.0)).rotated_local(Vector3.FORWARD, deg_to_rad(-50.0 * d))
 	_swing_tween = create_tween()
 	_swing_tween.tween_property(_sword, "transform", windup, 0.07)
 	_swing_tween.tween_property(_sword, "transform", slash, 0.10)
 	_swing_tween.tween_property(_sword, "transform", _sword_rest, 0.18)
+	_flash_arc(d)
+	_swing_dir = -_swing_dir
+
+## Flash the slash arc, mirrored to match the swing direction, then fade it out.
+func _flash_arc(d: float) -> void:
+	if _arc == null:
+		return
+	if _arc_tween and _arc_tween.is_valid():
+		_arc_tween.kill()
+	# Orient the crescent diagonally along the swing, flipped per direction.
+	_arc.rotation = Vector3(0.0, 0.0, deg_to_rad(-35.0 * d))
+	_arc.scale = Vector3(d, 1.0, 1.0)
+	_arc_mat.albedo_color = Color(1.0, 1.0, 1.0, 0.55)
+	_arc.visible = true
+	_arc_tween = create_tween()
+	_arc_tween.tween_property(_arc_mat, "albedo_color", Color(1.0, 1.0, 1.0, 0.0), 0.22)
+	_arc_tween.tween_callback(func() -> void: _arc.visible = false)
 
 ## A forward jab (spell cast), returning to rest.
 func _thrust() -> void:
