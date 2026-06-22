@@ -2,14 +2,14 @@ extends Node
 # No `class_name`: registered as the `PostProcess` autoload. A matching global
 # class would shadow the singleton and break clean compiles.
 """
-Global comic-book stylise post-process.
+Global stipple post-process.
 
-Owns a screen-filling ColorRect running the stylise shader (gradient colour
-remap + Sobel edge outline) over the rendered 3D frame. The overlay sits on a
-low CanvasLayer — below the HUD/menus (layer >= 1) — so only the 3D world is
+Owns a screen-filling ColorRect running the stipple shader (black halftone dots
+in shadows only) over the rendered 3D frame. The overlay sits on a low
+CanvasLayer — below the HUD/menus (layer >= 1) — so only the 3D world is
 stylised, and is shown only while a 3D camera is active (i.e. in gameplay, not
-the 2D main menu). Driven by Settings (stylize_enabled / color_mode /
-outline_enabled).
+the 2D main menu). Toggled by Settings.stylize_enabled. DayNightSky drives the
+sky-exclusion gradient via set_sky / clear_sky.
 """
 
 const SHADER_PATH: String = "res://addons/godot-multiplayer-weapon-system/shaders/stylize_post.gdshader"
@@ -37,9 +37,6 @@ func _ready() -> void:
 	_rect.material = _material
 	layer.add_child(_rect)
 
-	_refresh()
-	Settings.settings_changed.connect(_refresh)
-
 func _process(_delta: float) -> void:
 	# Only stylise when there's a 3D world on screen (gameplay), never the menus.
 	var cam := get_viewport().get_camera_3d()
@@ -58,9 +55,3 @@ func set_sky(day: float, sunset: float) -> void:
 func clear_sky() -> void:
 	if _material:
 		_material.set_shader_parameter("sky_enabled", false)
-
-func _refresh() -> void:
-	if _material == null:
-		return
-	_material.set_shader_parameter("color_mode", Settings.color_mode)
-	_material.set_shader_parameter("outline_enabled", Settings.outline_enabled)
