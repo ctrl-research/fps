@@ -54,3 +54,16 @@ func _refresh() -> void:
 	_material.set_shader_parameter("shadow_high", Settings.dither_high)
 	_material.set_shader_parameter("grain_size", Settings.dither_grain)
 	_material.set_shader_parameter("light_contrast", Settings.dither_contrast)
+
+## DayNightSky drives sky exclusion: sentinel pixels render as a smooth gradient
+## (day/sunset in 0..1) instead of being dithered.
+func set_sky(day: float, sunset: float) -> void:
+	if _material == null:
+		return
+	_material.set_shader_parameter("sky_enabled", true)
+	_material.set_shader_parameter("sky_day", day)
+	_material.set_shader_parameter("sky_sunset", sunset)
+
+func clear_sky() -> void:
+	if _material:
+		_material.set_shader_parameter("sky_enabled", false)
