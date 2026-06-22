@@ -50,6 +50,7 @@ func _refresh() -> void:
 	if _material == null:
 		return
 	_material.set_shader_parameter("shade_strength", Settings.dither_shade)
+	_material.set_shader_parameter("lit_strength", Settings.dither_lit)
 	_material.set_shader_parameter("shadow_low", Settings.dither_low)
 	_material.set_shader_parameter("shadow_high", Settings.dither_high)
 	_material.set_shader_parameter("grain_size", Settings.dither_grain)

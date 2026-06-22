@@ -21,11 +21,12 @@ const CROSSHAIR_STYLES: Array[String] = ["Cross", "Dot", "Circle", "X", "Star"]
 
 ## Dither two-tone shading defaults (live-tunable in Settings). Wide band + gentle
 ## contrast so the dither spans the full tonal range (lit *and* shaded surfaces).
-const DEFAULT_DITHER_SHADE: float = 0.30     # brightness of the shadow tone
-const DEFAULT_DITHER_LOW: float = 0.02       # luma where the dither starts
-const DEFAULT_DITHER_HIGH: float = 0.90      # luma where it ends (clean above)
+const DEFAULT_DITHER_SHADE: float = 0.50     # shadow tone brightness (visibility)
+const DEFAULT_DITHER_LIT: float = 0.95       # lit tone brightness
+const DEFAULT_DITHER_LOW: float = 0.02       # dither range start
+const DEFAULT_DITHER_HIGH: float = 0.90      # dither range end
 const DEFAULT_DITHER_GRAIN: float = 2.0      # dither grain size in pixels
-const DEFAULT_DITHER_CONTRAST: float = 1.4   # luminance contrast before banding
+const DEFAULT_DITHER_CONTRAST: float = 1.4   # how sharply lit/shade split
 const MAX_DITHER_CONTRAST: float = 4.0
 
 ## Player POV light: added contrast/shadow on top of ambient, not the only source.
@@ -35,7 +36,7 @@ const DEFAULT_POV_ENERGY: float = 2.0
 const MAX_POV_ENERGY: float = 8.0
 
 ## Ambient light: base visibility so the whole scene is readable.
-const DEFAULT_AMBIENT: float = 0.45
+const DEFAULT_AMBIENT: float = 0.70
 const MAX_AMBIENT: float = 1.5
 
 ## Actions exposed in the rebinding UI, in display order.
@@ -76,6 +77,7 @@ var crosshair_style: int = 0
 var stylize_enabled: bool = true
 ## Dither two-tone shading parameters (live-tunable).
 var dither_shade: float = DEFAULT_DITHER_SHADE
+var dither_lit: float = DEFAULT_DITHER_LIT
 var dither_low: float = DEFAULT_DITHER_LOW
 var dither_high: float = DEFAULT_DITHER_HIGH
 var dither_grain: float = DEFAULT_DITHER_GRAIN
@@ -153,6 +155,11 @@ func set_dither_shade(value: float) -> void:
 	save()
 	settings_changed.emit()
 
+func set_dither_lit(value: float) -> void:
+	dither_lit = clampf(value, 0.3, 1.2)
+	save()
+	settings_changed.emit()
+
 func set_dither_low(value: float) -> void:
 	dither_low = clampf(value, 0.0, 1.0)
 	save()
@@ -225,6 +232,7 @@ func save() -> void:
 	cfg.set_value("options", "crosshair_style", crosshair_style)
 	cfg.set_value("options", "stylize_enabled", stylize_enabled)
 	cfg.set_value("dither", "shade", dither_shade)
+	cfg.set_value("dither", "lit", dither_lit)
 	cfg.set_value("dither", "low", dither_low)
 	cfg.set_value("dither", "high", dither_high)
 	cfg.set_value("dither", "grain", dither_grain)
@@ -257,6 +265,7 @@ func _load() -> void:
 	crosshair_style = cfg.get_value("options", "crosshair_style", 0)
 	stylize_enabled = cfg.get_value("options", "stylize_enabled", true)
 	dither_shade = cfg.get_value("dither", "shade", DEFAULT_DITHER_SHADE)
+	dither_lit = cfg.get_value("dither", "lit", DEFAULT_DITHER_LIT)
 	dither_low = cfg.get_value("dither", "low", DEFAULT_DITHER_LOW)
 	dither_high = cfg.get_value("dither", "high", DEFAULT_DITHER_HIGH)
 	dither_grain = cfg.get_value("dither", "grain", DEFAULT_DITHER_GRAIN)
