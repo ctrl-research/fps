@@ -36,8 +36,21 @@ func _ready() -> void:
 	_rect.material = _material
 	layer.add_child(_rect)
 
+	_refresh()
+	Settings.settings_changed.connect(_refresh)
+
 func _process(_delta: float) -> void:
 	# Only stylise when there's a 3D world on screen (gameplay), never the menus.
 	var cam := get_viewport().get_camera_3d()
 	if _rect != null:
 		_rect.visible = Settings.stylize_enabled and cam != null
+
+## Push the live-tunable dither params from Settings into the shader.
+func _refresh() -> void:
+	if _material == null:
+		return
+	_material.set_shader_parameter("shade_strength", Settings.dither_shade)
+	_material.set_shader_parameter("shadow_low", Settings.dither_low)
+	_material.set_shader_parameter("shadow_high", Settings.dither_high)
+	_material.set_shader_parameter("grain_size", Settings.dither_grain)
+	_material.set_shader_parameter("light_contrast", Settings.dither_contrast)

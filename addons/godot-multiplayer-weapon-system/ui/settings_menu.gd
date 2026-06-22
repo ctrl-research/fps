@@ -32,7 +32,7 @@ func _build_ui() -> void:
 	add_child(center)
 
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(560, 620)
+	panel.custom_minimum_size = Vector2(580, 680)
 	center.add_child(panel)
 
 	var margin := MarginContainer.new()
@@ -97,12 +97,12 @@ func _build_ui() -> void:
 	autorun_check.toggled.connect(Settings.set_auto_run)
 	autorun_row.add_child(autorun_check)
 
-	# Comic stylise shader: master toggle, colour mode, edge outline.
+	# Dither shading: master toggle + live-tunable params.
 	var stylize_row := HBoxContainer.new()
 	stylize_row.add_theme_constant_override("separation", 12)
 	vbox.add_child(stylize_row)
 	var stylize_label := Label.new()
-	stylize_label.text = "Comic shader"
+	stylize_label.text = "Dither shading"
 	stylize_label.custom_minimum_size = Vector2(200, 0)
 	stylize_row.add_child(stylize_label)
 	var stylize_check := CheckButton.new()
@@ -110,31 +110,16 @@ func _build_ui() -> void:
 	stylize_check.toggled.connect(Settings.set_stylize_enabled)
 	stylize_row.add_child(stylize_check)
 
-	var color_row := HBoxContainer.new()
-	color_row.add_theme_constant_override("separation", 12)
-	vbox.add_child(color_row)
-	var color_label := Label.new()
-	color_label.text = "Color mode"
-	color_label.custom_minimum_size = Vector2(200, 0)
-	color_row.add_child(color_label)
-	var color_option := OptionButton.new()
-	for mode_name in Settings.COLOR_MODES:
-		color_option.add_item(mode_name)
-	color_option.selected = Settings.color_mode
-	color_option.item_selected.connect(Settings.set_color_mode)
-	color_row.add_child(color_option)
-
-	var outline_row := HBoxContainer.new()
-	outline_row.add_theme_constant_override("separation", 12)
-	vbox.add_child(outline_row)
-	var outline_label := Label.new()
-	outline_label.text = "Edge outlines"
-	outline_label.custom_minimum_size = Vector2(200, 0)
-	outline_row.add_child(outline_label)
-	var outline_check := CheckButton.new()
-	outline_check.button_pressed = Settings.outline_enabled
-	outline_check.toggled.connect(Settings.set_outline_enabled)
-	outline_row.add_child(outline_check)
+	vbox.add_child(_make_slider_row("Shade darkness", 0.0, 1.0, 0.02,
+		Settings.dither_shade, Settings.set_dither_shade))
+	vbox.add_child(_make_slider_row("Shadow band start", 0.0, 1.0, 0.02,
+		Settings.dither_low, Settings.set_dither_low))
+	vbox.add_child(_make_slider_row("Shadow band end", 0.0, 1.0, 0.02,
+		Settings.dither_high, Settings.set_dither_high))
+	vbox.add_child(_make_slider_row("Grain size", 1.0, 6.0, 0.5,
+		Settings.dither_grain, Settings.set_dither_grain))
+	vbox.add_child(_make_slider_row("Light contrast", 0.5, 3.0, 0.1,
+		Settings.dither_contrast, Settings.set_dither_contrast))
 
 	# Master volume.
 	var volume_row := HBoxContainer.new()
@@ -181,7 +166,7 @@ func _build_ui() -> void:
 	# Keybind list.
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.custom_minimum_size = Vector2(0, 380)
+	scroll.custom_minimum_size = Vector2(0, 300)
 	vbox.add_child(scroll)
 	var list := VBoxContainer.new()
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -204,6 +189,31 @@ func _build_ui() -> void:
 	close_button.text = "Close"
 	close_button.pressed.connect(_on_close_pressed)
 	footer.add_child(close_button)
+
+## A labelled slider row with a live value readout, wired to `setter`.
+func _make_slider_row(text: String, min_v: float, max_v: float, step: float, value: float, setter: Callable) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	var label := Label.new()
+	label.text = text
+	label.custom_minimum_size = Vector2(200, 0)
+	row.add_child(label)
+	var slider := HSlider.new()
+	slider.min_value = min_v
+	slider.max_value = max_v
+	slider.step = step
+	slider.value = value
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(slider)
+	var value_label := Label.new()
+	value_label.custom_minimum_size = Vector2(56, 0)
+	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	value_label.text = "%.2f" % value
+	row.add_child(value_label)
+	slider.value_changed.connect(func(v: float) -> void:
+		setter.call(v)
+		value_label.text = "%.2f" % v)
+	return row
 
 func _make_bind_row(action: String) -> HBoxContainer:
 	var row := HBoxContainer.new()
