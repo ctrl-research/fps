@@ -19,8 +19,12 @@ const DEFAULT_MASTER_VOLUME: float = 0.75
 ## Crosshair shapes, in dropdown order (index stored as crosshair_style).
 const CROSSHAIR_STYLES: Array[String] = ["Cross", "Dot", "Circle", "X", "Star"]
 
-## Colour-remap modes for the stylise shader (index stored as color_mode).
-const COLOR_MODES: Array[String] = ["Classic", "Realistic"]
+## Dither two-tone shading defaults (live-tunable in Settings).
+const DEFAULT_DITHER_SHADE: float = 0.40     # brightness of the shadow tone
+const DEFAULT_DITHER_LOW: float = 0.12       # luma where shadow ends
+const DEFAULT_DITHER_HIGH: float = 0.45      # luma where full light begins
+const DEFAULT_DITHER_GRAIN: float = 2.0      # dither grain size in pixels
+const DEFAULT_DITHER_CONTRAST: float = 1.0   # luminance contrast before banding
 
 ## Actions exposed in the rebinding UI, in display order.
 const BINDABLE_ACTIONS: Array[String] = [
@@ -56,12 +60,14 @@ var auto_run: bool = false
 var master_volume: float = DEFAULT_MASTER_VOLUME
 ## Index into CROSSHAIR_STYLES.
 var crosshair_style: int = 0
-## Comic stylise post-process master toggle.
+## Dither shading post-process master toggle.
 var stylize_enabled: bool = true
-## Colour-remap mode: index into COLOR_MODES (0 Classic, 1 Realistic).
-var color_mode: int = 0
-## Sobel edge-outline toggle.
-var outline_enabled: bool = true
+## Dither two-tone shading parameters (live-tunable).
+var dither_shade: float = DEFAULT_DITHER_SHADE
+var dither_low: float = DEFAULT_DITHER_LOW
+var dither_high: float = DEFAULT_DITHER_HIGH
+var dither_grain: float = DEFAULT_DITHER_GRAIN
+var dither_contrast: float = DEFAULT_DITHER_CONTRAST
 
 # Default events captured from the project InputMap at boot, used by reset.
 var _default_events: Dictionary = {}
@@ -125,13 +131,28 @@ func set_stylize_enabled(value: bool) -> void:
 	save()
 	settings_changed.emit()
 
-func set_color_mode(index: int) -> void:
-	color_mode = clampi(index, 0, COLOR_MODES.size() - 1)
+func set_dither_shade(value: float) -> void:
+	dither_shade = clampf(value, 0.0, 1.0)
 	save()
 	settings_changed.emit()
 
-func set_outline_enabled(value: bool) -> void:
-	outline_enabled = value
+func set_dither_low(value: float) -> void:
+	dither_low = clampf(value, 0.0, 1.0)
+	save()
+	settings_changed.emit()
+
+func set_dither_high(value: float) -> void:
+	dither_high = clampf(value, 0.0, 1.0)
+	save()
+	settings_changed.emit()
+
+func set_dither_grain(value: float) -> void:
+	dither_grain = clampf(value, 1.0, 6.0)
+	save()
+	settings_changed.emit()
+
+func set_dither_contrast(value: float) -> void:
+	dither_contrast = clampf(value, 0.5, 3.0)
 	save()
 	settings_changed.emit()
 
@@ -171,8 +192,11 @@ func save() -> void:
 	cfg.set_value("audio", "master_volume", master_volume)
 	cfg.set_value("options", "crosshair_style", crosshair_style)
 	cfg.set_value("options", "stylize_enabled", stylize_enabled)
-	cfg.set_value("options", "color_mode", color_mode)
-	cfg.set_value("options", "outline_enabled", outline_enabled)
+	cfg.set_value("dither", "shade", dither_shade)
+	cfg.set_value("dither", "low", dither_low)
+	cfg.set_value("dither", "high", dither_high)
+	cfg.set_value("dither", "grain", dither_grain)
+	cfg.set_value("dither", "contrast", dither_contrast)
 	for action in BINDABLE_ACTIONS:
 		if not InputMap.has_action(action):
 			continue
@@ -197,8 +221,11 @@ func _load() -> void:
 	master_volume = cfg.get_value("audio", "master_volume", DEFAULT_MASTER_VOLUME)
 	crosshair_style = cfg.get_value("options", "crosshair_style", 0)
 	stylize_enabled = cfg.get_value("options", "stylize_enabled", true)
-	color_mode = cfg.get_value("options", "color_mode", 0)
-	outline_enabled = cfg.get_value("options", "outline_enabled", true)
+	dither_shade = cfg.get_value("dither", "shade", DEFAULT_DITHER_SHADE)
+	dither_low = cfg.get_value("dither", "low", DEFAULT_DITHER_LOW)
+	dither_high = cfg.get_value("dither", "high", DEFAULT_DITHER_HIGH)
+	dither_grain = cfg.get_value("dither", "grain", DEFAULT_DITHER_GRAIN)
+	dither_contrast = cfg.get_value("dither", "contrast", DEFAULT_DITHER_CONTRAST)
 	if not cfg.has_section("keys"):
 		return
 	for action in cfg.get_section_keys("keys"):
