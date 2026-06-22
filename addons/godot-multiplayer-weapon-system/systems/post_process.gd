@@ -46,6 +46,19 @@ func _process(_delta: float) -> void:
 	if _rect != null:
 		_rect.visible = Settings.stylize_enabled and cam != null
 
+## DayNightSky drives the sky-exclusion colours (day/sunset in 0..1).
+func set_sky(day: float, sunset: float) -> void:
+	if _material == null:
+		return
+	_material.set_shader_parameter("sky_enabled", true)
+	_material.set_shader_parameter("sky_day", day)
+	_material.set_shader_parameter("sky_sunset", sunset)
+
+## Disable sky exclusion (modes without a procedural sky).
+func clear_sky() -> void:
+	if _material:
+		_material.set_shader_parameter("sky_enabled", false)
+
 func _refresh() -> void:
 	if _material == null:
 		return
