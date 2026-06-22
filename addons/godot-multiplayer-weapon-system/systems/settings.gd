@@ -27,6 +27,12 @@ const DEFAULT_DITHER_GRAIN: float = 2.0      # dither grain size in pixels
 const DEFAULT_DITHER_CONTRAST: float = 3.0   # luminance contrast before banding
 const MAX_DITHER_CONTRAST: float = 4.0
 
+## Player POV light (the world's light source).
+const DEFAULT_POV_RANGE: float = 80.0
+const MAX_POV_RANGE: float = 200.0
+const DEFAULT_POV_ENERGY: float = 3.5
+const MAX_POV_ENERGY: float = 8.0
+
 ## Actions exposed in the rebinding UI, in display order.
 const BINDABLE_ACTIONS: Array[String] = [
 	"move_forward", "move_backward", "move_left", "move_right",
@@ -69,6 +75,9 @@ var dither_low: float = DEFAULT_DITHER_LOW
 var dither_high: float = DEFAULT_DITHER_HIGH
 var dither_grain: float = DEFAULT_DITHER_GRAIN
 var dither_contrast: float = DEFAULT_DITHER_CONTRAST
+## Player POV light range/brightness.
+var pov_range: float = DEFAULT_POV_RANGE
+var pov_energy: float = DEFAULT_POV_ENERGY
 
 # Default events captured from the project InputMap at boot, used by reset.
 var _default_events: Dictionary = {}
@@ -157,6 +166,16 @@ func set_dither_contrast(value: float) -> void:
 	save()
 	settings_changed.emit()
 
+func set_pov_range(value: float) -> void:
+	pov_range = clampf(value, 5.0, MAX_POV_RANGE)
+	save()
+	settings_changed.emit()
+
+func set_pov_energy(value: float) -> void:
+	pov_energy = clampf(value, 0.0, MAX_POV_ENERGY)
+	save()
+	settings_changed.emit()
+
 ## Apply the master volume to the Master audio bus (mute at zero to avoid -inf dB).
 func _apply_volume() -> void:
 	var bus := AudioServer.get_bus_index("Master")
@@ -198,6 +217,8 @@ func save() -> void:
 	cfg.set_value("dither", "high", dither_high)
 	cfg.set_value("dither", "grain", dither_grain)
 	cfg.set_value("dither", "contrast", dither_contrast)
+	cfg.set_value("lighting", "pov_range", pov_range)
+	cfg.set_value("lighting", "pov_energy", pov_energy)
 	for action in BINDABLE_ACTIONS:
 		if not InputMap.has_action(action):
 			continue
@@ -227,6 +248,8 @@ func _load() -> void:
 	dither_high = cfg.get_value("dither", "high", DEFAULT_DITHER_HIGH)
 	dither_grain = cfg.get_value("dither", "grain", DEFAULT_DITHER_GRAIN)
 	dither_contrast = cfg.get_value("dither", "contrast", DEFAULT_DITHER_CONTRAST)
+	pov_range = cfg.get_value("lighting", "pov_range", DEFAULT_POV_RANGE)
+	pov_energy = cfg.get_value("lighting", "pov_energy", DEFAULT_POV_ENERGY)
 	if not cfg.has_section("keys"):
 		return
 	for action in cfg.get_section_keys("keys"):
