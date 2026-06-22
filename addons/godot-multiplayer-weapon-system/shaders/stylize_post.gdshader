@@ -128,8 +128,12 @@ vec3 ray_from_uv(vec2 uv) {
 
 void fragment() {
 	vec3 src = texture(screen_tex, SCREEN_UV).rgb;
-	// Sentinel background = sky: reconstruct it un-stylised.
-	if (sky_enabled && distance(src, sky_sentinel) < 0.15) {
+	// Sentinel background = sky: reconstruct it un-stylised. Detect the magenta
+	// sentinel by its hue (high R + high B, ~zero G) rather than an exact colour
+	// match, so tonemapping/exposure scaling the background can't defeat it.
+	// Nothing in the grey/yellow/blue/red palette has this signature.
+	bool is_sky = src.r > 0.25 && src.b > 0.25 && src.g < 0.2 && abs(src.r - src.b) < 0.25;
+	if (sky_enabled && is_sky) {
 		COLOR = vec4(compute_sky(ray_from_uv(SCREEN_UV), TIME), 1.0);
 		return;
 	}

@@ -86,6 +86,8 @@ void sky() {
 var _env: WorldEnvironment = null
 var _sun: DirectionalLight3D = null
 var _sky_mat: ShaderMaterial = null
+var _cur_day: float = 1.0
+var _cur_sunset: float = 0.0
 
 func _ready() -> void:
 	_sky_mat = ShaderMaterial.new()
@@ -112,6 +114,12 @@ func _ready() -> void:
 	Settings.settings_changed.connect(_apply_background)
 	apply(0.0)
 
+func _process(_delta: float) -> void:
+	# Push the sky params every frame so the post-process sky reconstruction can
+	# never be left disabled by a timing window, and tracks the sun smoothly.
+	if _sun and Settings.stylize_enabled:
+		PostProcess.set_sky(-_sun.global_transform.basis.z, _cur_day, _cur_sunset)
+
 func _exit_tree() -> void:
 	PostProcess.clear_sky()
 
@@ -135,6 +143,8 @@ func apply(progress: float) -> void:
 		_sun.rotation_degrees = Vector3(pitch, lerpf(-40.0, 40.0, progress), 0.0)
 		var day := clampf(1.0 - progress, 0.05, 1.0)
 		var sunset := clampf(1.0 - absf(progress - 0.5) * 2.0, 0.0, 1.0)
+		_cur_day = day
+		_cur_sunset = sunset
 		_sun.light_energy = day * 1.1 + 0.05
 		var col := Color(1.0, 0.97, 0.9).lerp(Color(0.45, 0.5, 0.75), progress)
 		_sun.light_color = col.lerp(Color(1.0, 0.55, 0.25), sunset * 0.7)
