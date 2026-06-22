@@ -19,19 +19,24 @@ const DEFAULT_MASTER_VOLUME: float = 0.75
 ## Crosshair shapes, in dropdown order (index stored as crosshair_style).
 const CROSSHAIR_STYLES: Array[String] = ["Cross", "Dot", "Circle", "X", "Star"]
 
-## Dither two-tone shading defaults (live-tunable in Settings).
+## Dither two-tone shading defaults (live-tunable in Settings). Wide band + gentle
+## contrast so the dither spans the full tonal range (lit *and* shaded surfaces).
 const DEFAULT_DITHER_SHADE: float = 0.30     # brightness of the shadow tone
-const DEFAULT_DITHER_LOW: float = 0.06       # luma where shadow ends
-const DEFAULT_DITHER_HIGH: float = 0.20      # luma where full light begins
+const DEFAULT_DITHER_LOW: float = 0.02       # luma where the dither starts
+const DEFAULT_DITHER_HIGH: float = 0.90      # luma where it ends (clean above)
 const DEFAULT_DITHER_GRAIN: float = 2.0      # dither grain size in pixels
-const DEFAULT_DITHER_CONTRAST: float = 3.0   # luminance contrast before banding
+const DEFAULT_DITHER_CONTRAST: float = 1.4   # luminance contrast before banding
 const MAX_DITHER_CONTRAST: float = 4.0
 
-## Player POV light (the world's light source).
+## Player POV light: added contrast/shadow on top of ambient, not the only source.
 const DEFAULT_POV_RANGE: float = 80.0
 const MAX_POV_RANGE: float = 200.0
-const DEFAULT_POV_ENERGY: float = 3.5
+const DEFAULT_POV_ENERGY: float = 2.0
 const MAX_POV_ENERGY: float = 8.0
+
+## Ambient light: base visibility so the whole scene is readable.
+const DEFAULT_AMBIENT: float = 0.45
+const MAX_AMBIENT: float = 1.5
 
 ## Actions exposed in the rebinding UI, in display order.
 const BINDABLE_ACTIONS: Array[String] = [
@@ -78,6 +83,8 @@ var dither_contrast: float = DEFAULT_DITHER_CONTRAST
 ## Player POV light range/brightness.
 var pov_range: float = DEFAULT_POV_RANGE
 var pov_energy: float = DEFAULT_POV_ENERGY
+## Ambient light energy (base visibility).
+var ambient_light: float = DEFAULT_AMBIENT
 
 # Default events captured from the project InputMap at boot, used by reset.
 var _default_events: Dictionary = {}
@@ -176,6 +183,11 @@ func set_pov_energy(value: float) -> void:
 	save()
 	settings_changed.emit()
 
+func set_ambient_light(value: float) -> void:
+	ambient_light = clampf(value, 0.0, MAX_AMBIENT)
+	save()
+	settings_changed.emit()
+
 ## Apply the master volume to the Master audio bus (mute at zero to avoid -inf dB).
 func _apply_volume() -> void:
 	var bus := AudioServer.get_bus_index("Master")
@@ -219,6 +231,7 @@ func save() -> void:
 	cfg.set_value("dither", "contrast", dither_contrast)
 	cfg.set_value("lighting", "pov_range", pov_range)
 	cfg.set_value("lighting", "pov_energy", pov_energy)
+	cfg.set_value("lighting", "ambient", ambient_light)
 	for action in BINDABLE_ACTIONS:
 		if not InputMap.has_action(action):
 			continue
@@ -250,6 +263,7 @@ func _load() -> void:
 	dither_contrast = cfg.get_value("dither", "contrast", DEFAULT_DITHER_CONTRAST)
 	pov_range = cfg.get_value("lighting", "pov_range", DEFAULT_POV_RANGE)
 	pov_energy = cfg.get_value("lighting", "pov_energy", DEFAULT_POV_ENERGY)
+	ambient_light = cfg.get_value("lighting", "ambient", DEFAULT_AMBIENT)
 	if not cfg.has_section("keys"):
 		return
 	for action in cfg.get_section_keys("keys"):

@@ -94,16 +94,22 @@ func _ready() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
-	# Lighting comes from the player's POV light, not the sky. Keep only a low
-	# ambient floor so distant geometry stays a faintly-visible silhouette.
+	# Ambient gives base visibility for the whole scene; the POV light adds
+	# contrast/shadow on top. Ambient energy is live-tunable from Settings.
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.5, 0.52, 0.6)
-	env.ambient_light_energy = 0.15
 	_env = WorldEnvironment.new()
 	_env.environment = env
 	add_child(_env)
 
+	_update_ambient()
+	Settings.settings_changed.connect(_update_ambient)
 	apply(0.0)
+
+## Apply the live-tunable ambient (base visibility) from Settings.
+func _update_ambient() -> void:
+	if _env:
+		_env.environment.ambient_light_energy = Settings.ambient_light
 
 ## Set the time of day from match progress (0 day → 0.5 sunset → 1 night). Only
 ## the sky backdrop colour changes now — the world is lit by the POV light.
