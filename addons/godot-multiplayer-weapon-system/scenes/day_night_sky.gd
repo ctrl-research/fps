@@ -80,7 +80,6 @@ void sky() {
 """
 
 var _env: WorldEnvironment = null
-var _sun: DirectionalLight3D = null
 var _sky_mat: ShaderMaterial = null
 
 func _ready() -> void:
@@ -95,30 +94,22 @@ func _ready() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
+	# Lighting comes from the player's POV light, not the sky. Keep only a low
+	# ambient floor so distant geometry stays a faintly-visible silhouette.
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.45, 0.47, 0.55)
+	env.ambient_light_color = Color(0.5, 0.52, 0.6)
+	env.ambient_light_energy = 0.15
 	_env = WorldEnvironment.new()
 	_env.environment = env
 	add_child(_env)
 
-	_sun = DirectionalLight3D.new()
-	add_child(_sun)
-
 	apply(0.0)
 
-## Set the time of day from match progress (0 day → 0.5 sunset → 1 night).
+## Set the time of day from match progress (0 day → 0.5 sunset → 1 night). Only
+## the sky backdrop colour changes now — the world is lit by the POV light.
 func apply(progress: float) -> void:
 	progress = clampf(progress, 0.0, 1.0)
-	# Sun arcs from high (day) through the horizon (sunset) to below it (night).
-	var pitch := lerpf(-65.0, 0.0, progress / 0.5) if progress < 0.5 else lerpf(0.0, 25.0, (progress - 0.5) / 0.5)
-	if _sun:
-		_sun.rotation_degrees = Vector3(pitch, lerpf(-40.0, 40.0, progress), 0.0)
-		var day := clampf(1.0 - progress, 0.05, 1.0)
-		var sunset := clampf(1.0 - absf(progress - 0.5) * 2.0, 0.0, 1.0)
-		_sun.light_energy = day * 1.1 + 0.05
-		var col := Color(1.0, 0.97, 0.9).lerp(Color(0.45, 0.5, 0.75), progress)
-		_sun.light_color = col.lerp(Color(1.0, 0.55, 0.25), sunset * 0.7)
-		_env.environment.ambient_light_energy = 0.25 + day * 0.85
-		_env.environment.ambient_light_color = Color(0.35, 0.37, 0.5).lerp(Color(0.6, 0.65, 0.75), day)
-		_sky_mat.set_shader_parameter("day_factor", day)
-		_sky_mat.set_shader_parameter("sunset_factor", sunset)
+	var day := clampf(1.0 - progress, 0.05, 1.0)
+	var sunset := clampf(1.0 - absf(progress - 0.5) * 2.0, 0.0, 1.0)
+	_sky_mat.set_shader_parameter("day_factor", day)
+	_sky_mat.set_shader_parameter("sunset_factor", sunset)

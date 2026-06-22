@@ -140,6 +140,18 @@ func _ready() -> void:
 	var is_local := is_multiplayer_authority()
 	_camera.current = is_local
 
+	# Client-side POV light: the world is lit from the player's own viewpoint
+	# (Mortal Sin-style), so surfaces facing the player are lit and those facing
+	# away fall into the dithered shadow. Only the local view needs it.
+	if is_local:
+		var pov_light := OmniLight3D.new()
+		pov_light.name = "POVLight"
+		pov_light.omni_range = 55.0
+		pov_light.omni_attenuation = 1.2
+		pov_light.light_energy = 3.5
+		pov_light.shadow_enabled = false
+		_camera.add_child(pov_light)
+
 	# Class-arena combat: a melee base attack + cooldown abilities driven by the
 	# player's class/spec (replaces the gun controller).
 	_ability_controller = AbilityController.new()
