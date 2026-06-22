@@ -149,9 +149,23 @@ func _ready() -> void:
 		_pov_light.name = "POVLight"
 		_pov_light.omni_attenuation = 1.2
 		_pov_light.shadow_enabled = false
+		# Don't let the point-blank POV light blow out the viewmodel — it gets its
+		# own dim light below so its shadows still land in the dither band.
+		_pov_light.light_cull_mask &= ~VIEWMODEL_VISUAL_LAYER
 		_camera.add_child(_pov_light)
 		_update_pov_light()
 		Settings.settings_changed.connect(_update_pov_light)
+
+		# Dedicated viewmodel light: a fixed dim, angled light that only touches the
+		# viewmodel layer, so its lit faces stay clean and its shadowed faces fall
+		# into the dither band (independent of the world's brightness).
+		var vm_light := DirectionalLight3D.new()
+		vm_light.name = "ViewModelLight"
+		vm_light.light_cull_mask = VIEWMODEL_VISUAL_LAYER
+		vm_light.light_energy = 1.4
+		vm_light.rotation_degrees = Vector3(-35.0, 35.0, 0.0)
+		vm_light.shadow_enabled = false
+		_camera.add_child(vm_light)
 
 	# Class-arena combat: a melee base attack + cooldown abilities driven by the
 	# player's class/spec (replaces the gun controller).
