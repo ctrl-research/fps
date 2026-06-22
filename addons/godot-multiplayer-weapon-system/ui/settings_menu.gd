@@ -128,6 +128,10 @@ func _build_ui() -> void:
 		Settings.pov_energy, Settings.set_pov_energy))
 	vbox.add_child(_make_slider_row("Ambient light", 0.0, Settings.MAX_AMBIENT, 0.05,
 		Settings.ambient_light, Settings.set_ambient_light))
+	vbox.add_child(_make_slider_row("Viewmodel light", 0.0, Settings.MAX_VM_ENERGY, 0.1,
+		Settings.vm_energy, Settings.set_vm_energy))
+	vbox.add_child(_make_slider_row("Viewmodel light angle", -90.0, 0.0, 5.0,
+		Settings.vm_pitch, Settings.set_vm_pitch))
 
 	# Master volume.
 	var volume_row := HBoxContainer.new()
