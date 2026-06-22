@@ -79,8 +79,14 @@ void sky() {
 }
 """
 
+# Background colour while the dither effect is on, so PostProcess can detect sky
+# pixels and draw a smooth (un-dithered) sky there. Must not occur on geometry.
+const SENTINEL: Color = Color(1.0, 0.0, 1.0)
+
 var _env: WorldEnvironment = null
 var _sky_mat: ShaderMaterial = null
+var _day: float = 1.0
+var _sunset: float = 0.0
 
 func _ready() -> void:
 	_sky_mat = ShaderMaterial.new()
@@ -103,19 +109,40 @@ func _ready() -> void:
 	add_child(_env)
 
 	_update_ambient()
-	Settings.settings_changed.connect(_update_ambient)
 	apply(0.0)
+	_apply_background()
+	Settings.settings_changed.connect(_update_ambient)
+	Settings.settings_changed.connect(_apply_background)
+
+func _exit_tree() -> void:
+	PostProcess.clear_sky()
 
 ## Apply the live-tunable ambient (base visibility) from Settings.
 func _update_ambient() -> void:
 	if _env:
 		_env.environment.ambient_light_energy = Settings.ambient_light
 
+## With the dither effect on, clear the 3D background to a sentinel colour so
+## PostProcess draws a smooth (un-dithered) sky there; with it off, show the real
+## procedural sky.
+func _apply_background() -> void:
+	if _env == null:
+		return
+	if Settings.stylize_enabled:
+		_env.environment.background_mode = Environment.BG_COLOR
+		_env.environment.background_color = SENTINEL
+		PostProcess.set_sky(_day, _sunset)
+	else:
+		_env.environment.background_mode = Environment.BG_SKY
+		PostProcess.clear_sky()
+
 ## Set the time of day from match progress (0 day → 0.5 sunset → 1 night). Only
 ## the sky backdrop colour changes now — the world is lit by the POV light.
 func apply(progress: float) -> void:
 	progress = clampf(progress, 0.0, 1.0)
-	var day := clampf(1.0 - progress, 0.05, 1.0)
-	var sunset := clampf(1.0 - absf(progress - 0.5) * 2.0, 0.0, 1.0)
-	_sky_mat.set_shader_parameter("day_factor", day)
-	_sky_mat.set_shader_parameter("sunset_factor", sunset)
+	_day = clampf(1.0 - progress, 0.05, 1.0)
+	_sunset = clampf(1.0 - absf(progress - 0.5) * 2.0, 0.0, 1.0)
+	_sky_mat.set_shader_parameter("day_factor", _day)
+	_sky_mat.set_shader_parameter("sunset_factor", _sunset)
+	if Settings.stylize_enabled:
+		PostProcess.set_sky(_day, _sunset)
