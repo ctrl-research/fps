@@ -118,7 +118,7 @@ func _build_ui() -> void:
 		Settings.dither_high, Settings.set_dither_high))
 	vbox.add_child(_make_slider_row("Grain size", 1.0, 6.0, 0.5,
 		Settings.dither_grain, Settings.set_dither_grain))
-	vbox.add_child(_make_slider_row("Light contrast", 0.5, 3.0, 0.1,
+	vbox.add_child(_make_slider_row("Light contrast", 0.5, Settings.MAX_DITHER_CONTRAST, 0.1,
 		Settings.dither_contrast, Settings.set_dither_contrast))
 
 	# Master volume.
