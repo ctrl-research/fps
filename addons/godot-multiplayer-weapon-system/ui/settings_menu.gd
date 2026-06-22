@@ -32,7 +32,7 @@ func _build_ui() -> void:
 	add_child(center)
 
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(580, 680)
+	panel.custom_minimum_size = Vector2(580, 720)
 	center.add_child(panel)
 
 	var margin := MarginContainer.new()
@@ -120,6 +120,10 @@ func _build_ui() -> void:
 		Settings.dither_grain, Settings.set_dither_grain))
 	vbox.add_child(_make_slider_row("Light contrast", 0.5, Settings.MAX_DITHER_CONTRAST, 0.1,
 		Settings.dither_contrast, Settings.set_dither_contrast))
+	vbox.add_child(_make_slider_row("Light radius", 5.0, Settings.MAX_POV_RANGE, 5.0,
+		Settings.pov_range, Settings.set_pov_range))
+	vbox.add_child(_make_slider_row("Light brightness", 0.0, Settings.MAX_POV_ENERGY, 0.25,
+		Settings.pov_energy, Settings.set_pov_energy))
 
 	# Master volume.
 	var volume_row := HBoxContainer.new()
@@ -166,7 +170,7 @@ func _build_ui() -> void:
 	# Keybind list.
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.custom_minimum_size = Vector2(0, 300)
+	scroll.custom_minimum_size = Vector2(0, 240)
 	vbox.add_child(scroll)
 	var list := VBoxContainer.new()
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL

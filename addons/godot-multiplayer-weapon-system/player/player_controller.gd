@@ -69,6 +69,7 @@ var sync_rotation: Vector3 = Vector3.ZERO
 
 # === State ===
 var _camera: Camera3D
+var _pov_light: OmniLight3D = null
 var _current_speed: float = WALK_SPEED
 var _is_crouching: bool = false
 var _crouch_height_current: float = STAND_HEIGHT
@@ -144,13 +145,27 @@ func _ready() -> void:
 	# (Mortal Sin-style), so surfaces facing the player are lit and those facing
 	# away fall into the dithered shadow. Only the local view needs it.
 	if is_local:
-		var pov_light := OmniLight3D.new()
-		pov_light.name = "POVLight"
-		pov_light.omni_range = 55.0
-		pov_light.omni_attenuation = 1.2
-		pov_light.light_energy = 3.5
-		pov_light.shadow_enabled = false
-		_camera.add_child(pov_light)
+		_pov_light = OmniLight3D.new()
+		_pov_light.name = "POVLight"
+		_pov_light.omni_attenuation = 1.2
+		_pov_light.shadow_enabled = false
+		# Don't let the point-blank POV light blow out the viewmodel — it gets its
+		# own dim light below so its shadows still land in the dither band.
+		_pov_light.light_cull_mask &= ~VIEWMODEL_VISUAL_LAYER
+		_camera.add_child(_pov_light)
+		_update_pov_light()
+		Settings.settings_changed.connect(_update_pov_light)
+
+		# Dedicated viewmodel light: a fixed dim, angled light that only touches the
+		# viewmodel layer, so its lit faces stay clean and its shadowed faces fall
+		# into the dither band (independent of the world's brightness).
+		var vm_light := DirectionalLight3D.new()
+		vm_light.name = "ViewModelLight"
+		vm_light.light_cull_mask = VIEWMODEL_VISUAL_LAYER
+		vm_light.light_energy = 1.4
+		vm_light.rotation_degrees = Vector3(-35.0, 35.0, 0.0)
+		vm_light.shadow_enabled = false
+		_camera.add_child(vm_light)
 
 	# Class-arena combat: a melee base attack + cooldown abilities driven by the
 	# player's class/spec (replaces the gun controller).
@@ -189,6 +204,13 @@ func _ready() -> void:
 
 	# Sync initial position
 	sync_position = global_position
+
+## Apply the live-tunable POV light range/brightness from Settings.
+func _update_pov_light() -> void:
+	if _pov_light == null:
+		return
+	_pov_light.omni_range = Settings.pov_range
+	_pov_light.light_energy = Settings.pov_energy
 
 ## Build the visible character model so the player is seen by mirrors and other
 ## players. For the local player it is moved to a dedicated visual layer that its
