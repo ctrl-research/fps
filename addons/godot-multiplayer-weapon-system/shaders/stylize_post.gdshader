@@ -1,38 +1,37 @@
-// Global comic-book stylise post-process.
+// Stipple / halftone post-process.
 //
-// Two effects over the rendered 3D frame:
-//   1. Dynamic colour remapping — Classic posterises luminance (keeping hue),
-//        Realistic does a saturation + contrast grade.
-//   2. Sobel edge outline — luminance edge-detect that inks comic outlines.
+// Screen-space halftone: per-pixel luminance drives the size of ink dots over a
+// light "paper", keeping the source hue so team colours (red/blue/yellow) stay
+// readable. Optional Sobel ink outline.
 //
-// Sky exemption (no depth buffer on gl_compatibility): a mode using DayNightSky
-// clears the 3D background to a SENTINEL colour instead of an engine sky. Where
-// the rendered pixel is that sentinel, this shader reconstructs the procedural
-// sky from the camera ray and outputs it un-stylised, so the sky stays smooth
-// while the world is stylised. Mounted below the HUD by PostProcess.
+// Sky exemption (no depth buffer on gl_compatibility): when DayNightSky has the
+// effect on it clears the 3D background to a magenta SENTINEL. Where the pixel
+// is that sentinel, the procedural sky is reconstructed from the camera ray and
+// output un-stippled, so the sky stays smooth while the world is stippled.
+// Mounted below the HUD by PostProcess.
 shader_type canvas_item;
 
 uniform sampler2D screen_tex : hint_screen_texture, filter_linear;
 
-// 0 = Classic posterise, 1 = Realistic grade.
+// 0 = colour stipple (keeps hue), 1 = monochrome ink stipple.
 uniform int color_mode = 0;
-uniform float classic_bands : hint_range(2.0, 8.0) = 4.0;
+uniform float dot_size : hint_range(2.0, 12.0) = 4.0;       // pixels per dot cell
+uniform float paper_tint : hint_range(0.0, 1.0) = 0.25;    // 0 = white paper, 1 = full colour
+uniform float ink_darkness : hint_range(0.0, 0.6) = 0.30;  // dot colour = tone * this
 
 uniform bool outline_enabled = true;
 uniform float outline_thickness : hint_range(0.5, 4.0) = 1.6;
 uniform float outline_threshold : hint_range(0.02, 1.0) = 0.30;
 uniform vec3 outline_color : source_color = vec3(0.0);
 
-uniform float contrast : hint_range(0.5, 2.5) = 1.18;
-uniform float saturation : hint_range(0.0, 2.5) = 1.4;
-
 // Sky reconstruction (driven by PostProcess / DayNightSky).
 uniform bool sky_enabled = false;
-uniform vec3 sky_sentinel : source_color = vec3(1.0, 0.0, 1.0);
 uniform vec3 sky_sun_dir = vec3(0.0, -1.0, 0.0);  // light travel direction
 uniform float sky_day = 1.0;       // 1 = day, 0 = night
 uniform float sky_sunset = 0.0;    // peaks at sunset
-uniform mat3 cam_basis;
+uniform vec3 cam_basis_x = vec3(1.0, 0.0, 0.0);
+uniform vec3 cam_basis_y = vec3(0.0, 1.0, 0.0);
+uniform vec3 cam_basis_z = vec3(0.0, 0.0, 1.0);
 uniform float cam_tan = 0.5;       // tan(vertical_fov / 2)
 uniform float cam_aspect = 1.78;
 
@@ -40,15 +39,17 @@ float luma(vec3 c) {
 	return dot(c, vec3(0.299, 0.587, 0.114));
 }
 
-vec3 classic_posterize(vec3 c) {
+// Halftone: darker tone => larger ink dot within each screen-space cell.
+vec3 stipple(vec3 c, vec2 px) {
 	float l = luma(c);
-	float ql = (floor(l * classic_bands) + 0.5) / classic_bands;
-	return clamp(c * (ql / max(l, 0.001)), 0.0, 1.0);
-}
-
-vec3 realistic_grade(vec3 c) {
-	vec3 sat = mix(vec3(luma(c)), c, saturation);
-	return clamp((sat - 0.5) * contrast + 0.5, 0.0, 1.0);
+	vec2 f = fract(px / dot_size) - 0.5;
+	float dist = length(f) * 2.0;             // 0 at cell centre
+	float radius = (1.0 - l) * 1.1;           // bright => ~0 (no dot), dark => big
+	float dots = 1.0 - smoothstep(radius - 0.15, radius + 0.15, dist);
+	vec3 tone = (color_mode == 0) ? c : vec3(l);
+	vec3 paper = mix(vec3(1.0), tone, paper_tint);
+	vec3 ink = tone * ink_darkness;
+	return mix(paper, ink, dots);
 }
 
 float sobel(vec2 uv, vec2 px) {
@@ -123,21 +124,20 @@ vec3 compute_sky(vec3 dir, float t) {
 vec3 ray_from_uv(vec2 uv) {
 	vec2 ndc = uv * 2.0 - 1.0;
 	vec3 v = vec3(ndc.x * cam_tan * cam_aspect, -ndc.y * cam_tan, -1.0);
-	return normalize(cam_basis * v);
+	return normalize(v.x * cam_basis_x + v.y * cam_basis_y + v.z * cam_basis_z);
 }
 
 void fragment() {
 	vec3 src = texture(screen_tex, SCREEN_UV).rgb;
-	// Sentinel background = sky: reconstruct it un-stylised. Detect the magenta
-	// sentinel by its hue (high R + high B, ~zero G) rather than an exact colour
-	// match, so tonemapping/exposure scaling the background can't defeat it.
-	// Nothing in the grey/yellow/blue/red palette has this signature.
+	// Sentinel background = sky: reconstruct it un-stippled. Detect the magenta
+	// by hue (high R + high B, ~zero G), robust to tonemapping/exposure.
 	bool is_sky = src.r > 0.25 && src.b > 0.25 && src.g < 0.2 && abs(src.r - src.b) < 0.25;
 	if (sky_enabled && is_sky) {
 		COLOR = vec4(compute_sky(ray_from_uv(SCREEN_UV), TIME), 1.0);
 		return;
 	}
-	vec3 col = (color_mode == 0) ? classic_posterize(src) : realistic_grade(src);
+	vec2 px = SCREEN_UV / SCREEN_PIXEL_SIZE;
+	vec3 col = stipple(src, px);
 	if (outline_enabled) {
 		float e = sobel(SCREEN_UV, SCREEN_PIXEL_SIZE * outline_thickness);
 		col = mix(col, outline_color, step(outline_threshold, e));
