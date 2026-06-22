@@ -20,6 +20,7 @@ uniform float shadow_low : hint_range(0.0, 1.0) = 0.02;      // dither range sta
 uniform float shadow_high : hint_range(0.0, 1.0) = 0.90;     // dither range end
 uniform float grain_size : hint_range(1.0, 6.0) = 2.0;       // dither grain in pixels
 uniform float light_contrast : hint_range(0.5, 4.0) = 1.4;   // how sharply lit/shade split
+uniform float saturation : hint_range(0.0, 2.5) = 1.4;       // colour punch (Mortal Sin palette)
 
 // Sky exclusion (driven by PostProcess / DayNightSky).
 uniform bool sky_enabled = false;
@@ -51,6 +52,7 @@ void fragment() {
 	// World: two FLAT tones of the surface colour; lighting -> dither density.
 	float l = luma(src);
 	vec3 chroma = src / max(l, 0.08);                          // colour at unit brightness
+	chroma = clamp(mix(vec3(1.0), chroma, saturation), 0.0, 2.0);  // punch up saturation
 	vec3 lit_tone = clamp(chroma * lit_strength, 0.0, 1.0);
 	vec3 shade_tone = clamp(chroma * shade_strength, 0.0, 1.0);
 	float t = smoothstep(shadow_low, shadow_high, clamp((l - 0.5) * light_contrast + 0.5, 0.0, 1.0));

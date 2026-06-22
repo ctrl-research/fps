@@ -102,8 +102,10 @@ func _ready() -> void:
 	env.sky = sky
 	# Ambient gives base visibility for the whole scene; the POV light adds
 	# contrast/shadow on top. Ambient energy is live-tunable from Settings.
+	# Neutral ambient so surface colours read true (no blue wash) — the Mortal Sin
+	# palette wants punchy, readable surface colour, not a tint.
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.5, 0.52, 0.6)
+	env.ambient_light_color = Color(1.0, 0.99, 0.96)
 	_env = WorldEnvironment.new()
 	_env.environment = env
 	add_child(_env)
