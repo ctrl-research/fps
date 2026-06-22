@@ -39,6 +39,11 @@ const MAX_POV_ENERGY: float = 8.0
 const DEFAULT_AMBIENT: float = 0.70
 const MAX_AMBIENT: float = 1.5
 
+## Viewmodel key light (its own light, separate from the world).
+const DEFAULT_VM_ENERGY: float = 3.0
+const MAX_VM_ENERGY: float = 8.0
+const DEFAULT_VM_PITCH: float = -50.0    # degrees; steeper = shadow lower on the model
+
 ## Actions exposed in the rebinding UI, in display order.
 const BINDABLE_ACTIONS: Array[String] = [
 	"move_forward", "move_backward", "move_left", "move_right",
@@ -87,6 +92,9 @@ var pov_range: float = DEFAULT_POV_RANGE
 var pov_energy: float = DEFAULT_POV_ENERGY
 ## Ambient light energy (base visibility).
 var ambient_light: float = DEFAULT_AMBIENT
+## Viewmodel key light brightness / pitch angle.
+var vm_energy: float = DEFAULT_VM_ENERGY
+var vm_pitch: float = DEFAULT_VM_PITCH
 
 # Default events captured from the project InputMap at boot, used by reset.
 var _default_events: Dictionary = {}
@@ -195,6 +203,16 @@ func set_ambient_light(value: float) -> void:
 	save()
 	settings_changed.emit()
 
+func set_vm_energy(value: float) -> void:
+	vm_energy = clampf(value, 0.0, MAX_VM_ENERGY)
+	save()
+	settings_changed.emit()
+
+func set_vm_pitch(value: float) -> void:
+	vm_pitch = clampf(value, -90.0, 0.0)
+	save()
+	settings_changed.emit()
+
 ## Apply the master volume to the Master audio bus (mute at zero to avoid -inf dB).
 func _apply_volume() -> void:
 	var bus := AudioServer.get_bus_index("Master")
@@ -240,6 +258,8 @@ func save() -> void:
 	cfg.set_value("lighting", "pov_range", pov_range)
 	cfg.set_value("lighting", "pov_energy", pov_energy)
 	cfg.set_value("lighting", "ambient", ambient_light)
+	cfg.set_value("lighting", "vm_energy", vm_energy)
+	cfg.set_value("lighting", "vm_pitch", vm_pitch)
 	for action in BINDABLE_ACTIONS:
 		if not InputMap.has_action(action):
 			continue
@@ -273,6 +293,8 @@ func _load() -> void:
 	pov_range = cfg.get_value("lighting", "pov_range", DEFAULT_POV_RANGE)
 	pov_energy = cfg.get_value("lighting", "pov_energy", DEFAULT_POV_ENERGY)
 	ambient_light = cfg.get_value("lighting", "ambient", DEFAULT_AMBIENT)
+	vm_energy = cfg.get_value("lighting", "vm_energy", DEFAULT_VM_ENERGY)
+	vm_pitch = cfg.get_value("lighting", "vm_pitch", DEFAULT_VM_PITCH)
 	if not cfg.has_section("keys"):
 		return
 	for action in cfg.get_section_keys("keys"):
