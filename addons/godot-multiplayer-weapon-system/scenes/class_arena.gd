@@ -300,8 +300,10 @@ func _build_environment() -> void:
 	_sky = DayNightSky.new()
 	add_child(_sky)
 
-## Advance the time of day: sunset lands at the match midpoint (round
-## ROUNDS_TO_WIN), darkening toward night as the match runs long.
+## Advance the sky each round: time-of-day progress plus a "doom" redness that
+## ramps from clear (round 1) to fully red by round 8.
 func _update_day_night() -> void:
 	if _sky:
-		_sky.apply(clampf(float(_round - 1) / float(2 * ROUNDS_TO_WIN - 2), 0.0, 1.0))
+		var progress := clampf(float(_round - 1) / float(2 * ROUNDS_TO_WIN - 2), 0.0, 1.0)
+		var red := clampf(float(_round - 1) / 7.0, 0.0, 1.0)
+		_sky.apply(progress, red)

@@ -26,6 +26,7 @@ uniform float saturation : hint_range(0.0, 2.5) = 1.4;       // colour punch (Mo
 uniform bool sky_enabled = false;
 uniform float sky_day = 1.0;
 uniform float sky_sunset = 0.0;
+uniform float sky_red = 0.0;     // 0 = clear, 1 = fully red sky (late rounds)
 // Camera ray basis (vec3 columns) so the sky can be reconstructed per pixel with
 // world-direction clouds. Fed each frame by PostProcess.
 uniform vec3 cam_basis_x = vec3(1.0, 0.0, 0.0);
@@ -89,6 +90,11 @@ void fragment() {
 		cloud = mix(cloud, vec3(0.95, 0.45, 0.20), sky_sunset * 0.5);
 		sky_col = mix(sky_col, cloud, c * 0.85);
 	}
+	// Late-round redness: blend the whole sky toward a bright red.
+	vec3 red_top = vec3(0.42, 0.04, 0.03);
+	vec3 red_hor = vec3(0.88, 0.13, 0.06);
+	vec3 red_col = mix(red_hor, red_top, pow(up, 0.6));
+	sky_col = mix(sky_col, red_col, sky_red);
 
 	// World: two FLAT tones of the surface colour; lighting -> dither density.
 	float l = luma(src);
