@@ -609,14 +609,14 @@ func _swing() -> void:
 	# the tip forward and diagonally DOWN past the crosshair to the opposite side
 	# (strong forward pitch + roll across + a forward/down/across lunge of the whole
 	# blade). d flips it: top-right->down-left, then top-left->down-right.
-	var windup := _sword_rest.rotated_local(Vector3.FORWARD, deg_to_rad(-72.0 * d)).rotated_local(Vector3.RIGHT, deg_to_rad(38.0))
-	windup.origin += Vector3(0.06 * d, 0.05, 0.06)
-	var slash := _sword_rest.rotated_local(Vector3.FORWARD, deg_to_rad(72.0 * d)).rotated_local(Vector3.RIGHT, deg_to_rad(-98.0))
-	slash.origin += Vector3(-0.12 * d, -0.06, -0.2)
+	var windup := _sword_rest.rotated_local(Vector3.FORWARD, deg_to_rad(-92.0 * d)).rotated_local(Vector3.RIGHT, deg_to_rad(50.0))
+	windup.origin += Vector3(0.12 * d, 0.10, 0.10)
+	var slash := _sword_rest.rotated_local(Vector3.FORWARD, deg_to_rad(92.0 * d)).rotated_local(Vector3.RIGHT, deg_to_rad(-115.0))
+	slash.origin += Vector3(-0.22 * d, -0.14, -0.34)
 	_swing_tween = create_tween()
-	_swing_tween.tween_property(_sword, "transform", windup, 0.08)
-	_swing_tween.tween_property(_sword, "transform", slash, 0.12)
-	_swing_tween.tween_property(_sword, "transform", _sword_rest, 0.18)
+	_swing_tween.tween_property(_sword, "transform", windup, 0.10)
+	_swing_tween.tween_property(_sword, "transform", slash, 0.15)
+	_swing_tween.tween_property(_sword, "transform", _sword_rest, 0.20)
 	_flash_arc(d)
 	_swing_dir = -_swing_dir
 
@@ -631,13 +631,13 @@ func _flash_arc(d: float) -> void:
 	# crescent reads as a 3D arc out in front, not a flat decal. It sweeps across in
 	# the swing direction and grows, then vanishes. Opaque, so the colour is
 	# consistent over the world or the sky.
-	var tilt := deg_to_rad(-42.0)              # lean the top of the arc into the screen
-	_arc.rotation = Vector3(tilt, 0.0, deg_to_rad(-50.0 * d))
+	var tilt := deg_to_rad(-80.0)              # laid down nearly parallel with the ground
+	_arc.rotation = Vector3(tilt, 0.0, deg_to_rad(-58.0 * d))
 	_arc.scale = Vector3(0.8, 0.8, 0.8)
 	_arc.visible = true
 	_arc_tween = create_tween().set_parallel(true)
-	_arc_tween.tween_property(_arc, "rotation:z", deg_to_rad(50.0 * d), 0.18)
-	_arc_tween.tween_property(_arc, "scale", Vector3(1.35, 1.35, 1.35), 0.18)
+	_arc_tween.tween_property(_arc, "rotation:z", deg_to_rad(58.0 * d), 0.18)
+	_arc_tween.tween_property(_arc, "scale", Vector3(1.4, 1.4, 1.4), 0.18)
 	_arc_tween.chain().tween_callback(func() -> void: _arc.visible = false)
 
 ## A forward jab (spell cast), returning to rest.
