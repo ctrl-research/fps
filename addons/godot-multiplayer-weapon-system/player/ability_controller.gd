@@ -484,7 +484,7 @@ func _build_swing_arc() -> void:
 	_arc = MeshInstance3D.new()
 	_arc.mesh = _make_arc_mesh()
 	_arc.layers = PlayerController.VIEWMODEL_VISUAL_LAYER
-	_arc.position = Vector3(0.05, -0.05, -0.7)
+	_arc.position = Vector3(0.0, 0.0, -0.95)   # at the crosshair, out in front
 	_arc_mat = StandardMaterial3D.new()
 	_arc_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_arc_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -605,8 +605,11 @@ func _swing() -> void:
 	# blade winds up out to one side (raised back) then drives forward/inward to the
 	# centre (pitched toward the crosshair). _swing_dir flips the windup side.
 	var d := _swing_dir
-	var windup := _sword_rest.rotated_local(Vector3.RIGHT, deg_to_rad(22.0)).rotated_local(Vector3.FORWARD, deg_to_rad(55.0 * d))
-	var slash := _sword_rest.rotated_local(Vector3.RIGHT, deg_to_rad(-72.0)).rotated_local(Vector3.FORWARD, deg_to_rad(-12.0 * d))
+	# Big diagonal: windup cocks to a top corner (raised + rolled to one side),
+	# slash drives to the opposite bottom corner (pitched forward/down + rolled
+	# across). d flips the corners: top-right->bottom-left, then top-left->bottom-right.
+	var windup := _sword_rest.rotated_local(Vector3.FORWARD, deg_to_rad(-65.0 * d)).rotated_local(Vector3.RIGHT, deg_to_rad(40.0))
+	var slash := _sword_rest.rotated_local(Vector3.FORWARD, deg_to_rad(65.0 * d)).rotated_local(Vector3.RIGHT, deg_to_rad(-85.0))
 	_swing_tween = create_tween()
 	_swing_tween.tween_property(_sword, "transform", windup, 0.08)
 	_swing_tween.tween_property(_sword, "transform", slash, 0.11)
@@ -621,15 +624,17 @@ func _flash_arc(d: float) -> void:
 		return
 	if _arc_tween and _arc_tween.is_valid():
 		_arc_tween.kill()
-	# Start cocked to the windup side, then sweep inward to centre while growing
-	# (reads as the slash driving forward toward the crosshair), and fade.
-	_arc.rotation = Vector3(0.0, 0.0, deg_to_rad(-55.0 * d))
+	# Tilt the crescent forward (into the screen) so it reads as a 3D arc out at the
+	# crosshair, and sweep it diagonally from the windup corner to the slash corner
+	# (matching the swing), growing and fading.
+	var tilt := deg_to_rad(-35.0)              # lean the arc into the screen
+	_arc.rotation = Vector3(tilt, 0.0, deg_to_rad(65.0 * d))
 	_arc.scale = Vector3(0.85, 0.85, 0.85)
 	_arc_mat.albedo_color = Color(1.0, 1.0, 1.0, 0.6)
 	_arc.visible = true
 	_arc_tween = create_tween().set_parallel(true)
-	_arc_tween.tween_property(_arc, "rotation:z", 0.0, 0.2)
-	_arc_tween.tween_property(_arc, "scale", Vector3(1.2, 1.2, 1.2), 0.2)
+	_arc_tween.tween_property(_arc, "rotation:z", deg_to_rad(-65.0 * d), 0.2)
+	_arc_tween.tween_property(_arc, "scale", Vector3(1.3, 1.3, 1.3), 0.2)
 	_arc_tween.tween_property(_arc_mat, "albedo_color", Color(1.0, 1.0, 1.0, 0.0), 0.24)
 	_arc_tween.chain().tween_callback(func() -> void: _arc.visible = false)
 
