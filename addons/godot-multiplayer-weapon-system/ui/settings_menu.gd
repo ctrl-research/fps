@@ -13,8 +13,6 @@ signal closed()
 
 var _rebind_buttons: Dictionary = {}  # action -> Button
 var _listening_action: String = ""
-var _sensitivity_value_label: Label = null
-var _volume_value_label: Label = null
 
 func _ready() -> void:
 	layer = 20
@@ -32,7 +30,7 @@ func _build_ui() -> void:
 	add_child(center)
 
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(580, 720)
+	panel.custom_minimum_size = Vector2(620, 600)
 	center.add_child(panel)
 
 	var margin := MarginContainer.new()
@@ -50,143 +48,49 @@ func _build_ui() -> void:
 	title.add_theme_font_size_override("font_size", 28)
 	vbox.add_child(title)
 
-	# Mouse sensitivity.
-	var sens_row := HBoxContainer.new()
-	sens_row.add_theme_constant_override("separation", 12)
-	vbox.add_child(sens_row)
-	var sens_label := Label.new()
-	sens_label.text = "Mouse Sensitivity"
-	sens_label.custom_minimum_size = Vector2(200, 0)
-	sens_row.add_child(sens_label)
-	var slider := HSlider.new()
-	slider.min_value = Settings.MIN_MOUSE_SENSITIVITY
-	slider.max_value = Settings.MAX_MOUSE_SENSITIVITY
-	slider.step = 0.0001
-	slider.value = Settings.mouse_sensitivity
-	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	slider.value_changed.connect(_on_sensitivity_changed)
-	sens_row.add_child(slider)
-	_sensitivity_value_label = Label.new()
-	_sensitivity_value_label.custom_minimum_size = Vector2(56, 0)
-	_sensitivity_value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	sens_row.add_child(_sensitivity_value_label)
+	# Tabbed categories; each tab scrolls so the menu can grow.
+	var tabs := TabContainer.new()
+	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_child(tabs)
 
-	# Rotate minimap toggle.
-	var minimap_row := HBoxContainer.new()
-	minimap_row.add_theme_constant_override("separation", 12)
-	vbox.add_child(minimap_row)
-	var minimap_label := Label.new()
-	minimap_label.text = "Rotate minimap with view"
-	minimap_label.custom_minimum_size = Vector2(200, 0)
-	minimap_row.add_child(minimap_label)
-	var minimap_check := CheckButton.new()
-	minimap_check.button_pressed = Settings.minimap_rotates
-	minimap_check.toggled.connect(Settings.set_minimap_rotates)
-	minimap_row.add_child(minimap_check)
+	# --- Graphics ---
+	var gfx := _make_tab(tabs, "Graphics")
+	gfx.add_child(_make_toggle_row("Dither shading", Settings.stylize_enabled, Settings.set_stylize_enabled))
+	gfx.add_child(_make_slider_row("Shadow brightness", 0.0, 1.0, 0.02, Settings.dither_shade, Settings.set_dither_shade))
+	gfx.add_child(_make_slider_row("Lit brightness", 0.3, 1.2, 0.02, Settings.dither_lit, Settings.set_dither_lit))
+	gfx.add_child(_make_slider_row("Shadow band start", 0.0, 1.0, 0.02, Settings.dither_low, Settings.set_dither_low))
+	gfx.add_child(_make_slider_row("Shadow band end", 0.0, 1.0, 0.02, Settings.dither_high, Settings.set_dither_high))
+	gfx.add_child(_make_slider_row("Grain size", 1.0, 6.0, 0.5, Settings.dither_grain, Settings.set_dither_grain))
+	gfx.add_child(_make_slider_row("Light contrast", 0.5, Settings.MAX_DITHER_CONTRAST, 0.1, Settings.dither_contrast, Settings.set_dither_contrast))
+	gfx.add_child(_make_slider_row("Light radius", 5.0, Settings.MAX_POV_RANGE, 5.0, Settings.pov_range, Settings.set_pov_range))
+	gfx.add_child(_make_slider_row("Light brightness", 0.0, Settings.MAX_POV_ENERGY, 0.25, Settings.pov_energy, Settings.set_pov_energy))
+	gfx.add_child(_make_slider_row("Ambient light", 0.0, Settings.MAX_AMBIENT, 0.05, Settings.ambient_light, Settings.set_ambient_light))
+	gfx.add_child(_make_slider_row("Viewmodel light", 0.0, Settings.MAX_VM_ENERGY, 0.1, Settings.vm_energy, Settings.set_vm_energy))
+	gfx.add_child(_make_slider_row("Viewmodel light angle", -90.0, 0.0, 5.0, Settings.vm_pitch, Settings.set_vm_pitch))
 
-	# Auto-run toggle (sprint by default; sprint key walks).
-	var autorun_row := HBoxContainer.new()
-	autorun_row.add_theme_constant_override("separation", 12)
-	vbox.add_child(autorun_row)
-	var autorun_label := Label.new()
-	autorun_label.text = "Auto-run (sprint by default)"
-	autorun_label.custom_minimum_size = Vector2(200, 0)
-	autorun_row.add_child(autorun_label)
-	var autorun_check := CheckButton.new()
-	autorun_check.button_pressed = Settings.auto_run
-	autorun_check.toggled.connect(Settings.set_auto_run)
-	autorun_row.add_child(autorun_check)
+	# --- Audio ---
+	var audio := _make_tab(tabs, "Audio")
+	audio.add_child(_make_slider_row("Master volume", 0.0, 1.0, 0.05, Settings.master_volume, Settings.set_master_volume, 100.0, "%d%%"))
 
-	# Dither shading: master toggle + live-tunable params.
-	var stylize_row := HBoxContainer.new()
-	stylize_row.add_theme_constant_override("separation", 12)
-	vbox.add_child(stylize_row)
-	var stylize_label := Label.new()
-	stylize_label.text = "Dither shading"
-	stylize_label.custom_minimum_size = Vector2(200, 0)
-	stylize_row.add_child(stylize_label)
-	var stylize_check := CheckButton.new()
-	stylize_check.button_pressed = Settings.stylize_enabled
-	stylize_check.toggled.connect(Settings.set_stylize_enabled)
-	stylize_row.add_child(stylize_check)
+	# --- Gameplay ---
+	var gp := _make_tab(tabs, "Gameplay")
+	gp.add_child(_make_toggle_row("Rotate minimap with view", Settings.minimap_rotates, Settings.set_minimap_rotates))
+	gp.add_child(_make_toggle_row("Auto-run (sprint by default)", Settings.auto_run, Settings.set_auto_run))
+	gp.add_child(_make_option_row("Crosshair", Settings.CROSSHAIR_STYLES, Settings.crosshair_style, Settings.set_crosshair_style))
 
-	vbox.add_child(_make_slider_row("Shadow brightness", 0.0, 1.0, 0.02,
-		Settings.dither_shade, Settings.set_dither_shade))
-	vbox.add_child(_make_slider_row("Lit brightness", 0.3, 1.2, 0.02,
-		Settings.dither_lit, Settings.set_dither_lit))
-	vbox.add_child(_make_slider_row("Shadow band start", 0.0, 1.0, 0.02,
-		Settings.dither_low, Settings.set_dither_low))
-	vbox.add_child(_make_slider_row("Shadow band end", 0.0, 1.0, 0.02,
-		Settings.dither_high, Settings.set_dither_high))
-	vbox.add_child(_make_slider_row("Grain size", 1.0, 6.0, 0.5,
-		Settings.dither_grain, Settings.set_dither_grain))
-	vbox.add_child(_make_slider_row("Light contrast", 0.5, Settings.MAX_DITHER_CONTRAST, 0.1,
-		Settings.dither_contrast, Settings.set_dither_contrast))
-	vbox.add_child(_make_slider_row("Light radius", 5.0, Settings.MAX_POV_RANGE, 5.0,
-		Settings.pov_range, Settings.set_pov_range))
-	vbox.add_child(_make_slider_row("Light brightness", 0.0, Settings.MAX_POV_ENERGY, 0.25,
-		Settings.pov_energy, Settings.set_pov_energy))
-	vbox.add_child(_make_slider_row("Ambient light", 0.0, Settings.MAX_AMBIENT, 0.05,
-		Settings.ambient_light, Settings.set_ambient_light))
-	vbox.add_child(_make_slider_row("Viewmodel light", 0.0, Settings.MAX_VM_ENERGY, 0.1,
-		Settings.vm_energy, Settings.set_vm_energy))
-	vbox.add_child(_make_slider_row("Viewmodel light angle", -90.0, 0.0, 5.0,
-		Settings.vm_pitch, Settings.set_vm_pitch))
-
-	# Master volume.
-	var volume_row := HBoxContainer.new()
-	volume_row.add_theme_constant_override("separation", 12)
-	vbox.add_child(volume_row)
-	var volume_label := Label.new()
-	volume_label.text = "Master Volume"
-	volume_label.custom_minimum_size = Vector2(200, 0)
-	volume_row.add_child(volume_label)
-	var volume_slider := HSlider.new()
-	volume_slider.min_value = 0.0
-	volume_slider.max_value = 1.0
-	volume_slider.step = 0.05
-	volume_slider.value = Settings.master_volume
-	volume_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	volume_row.add_child(volume_slider)
-	_volume_value_label = Label.new()
-	_volume_value_label.custom_minimum_size = Vector2(56, 0)
-	_volume_value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	volume_row.add_child(_volume_value_label)
-	volume_slider.value_changed.connect(_on_volume_changed)
-
-	# Crosshair shape.
-	var crosshair_row := HBoxContainer.new()
-	crosshair_row.add_theme_constant_override("separation", 12)
-	vbox.add_child(crosshair_row)
-	var crosshair_label := Label.new()
-	crosshair_label.text = "Crosshair"
-	crosshair_label.custom_minimum_size = Vector2(200, 0)
-	crosshair_row.add_child(crosshair_label)
-	var crosshair_option := OptionButton.new()
-	for style_name in Settings.CROSSHAIR_STYLES:
-		crosshair_option.add_item(style_name)
-	crosshair_option.selected = Settings.crosshair_style
-	crosshair_option.item_selected.connect(Settings.set_crosshair_style)
-	crosshair_row.add_child(crosshair_option)
-
+	# --- Controls ---
+	var ctrl := _make_tab(tabs, "Controls")
+	ctrl.add_child(_make_slider_row("Mouse sensitivity", Settings.MIN_MOUSE_SENSITIVITY,
+		Settings.MAX_MOUSE_SENSITIVITY, 0.0001, Settings.mouse_sensitivity, Settings.set_mouse_sensitivity, 1000.0, "%.1f"))
 	var hint := Label.new()
 	hint.text = "Click a binding, then press a key or mouse button (Esc to cancel)."
 	hint.add_theme_font_size_override("font_size", 13)
 	hint.modulate = Color(0.7, 0.75, 0.8)
-	vbox.add_child(hint)
-
-	# Keybind list.
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.custom_minimum_size = Vector2(0, 180)
-	vbox.add_child(scroll)
-	var list := VBoxContainer.new()
-	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	list.add_theme_constant_override("separation", 6)
-	scroll.add_child(list)
-
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	ctrl.add_child(hint)
 	for action in Settings.BINDABLE_ACTIONS:
-		list.add_child(_make_bind_row(action))
+		ctrl.add_child(_make_bind_row(action))
 
 	# Footer.
 	var footer := HBoxContainer.new()
@@ -202,8 +106,21 @@ func _build_ui() -> void:
 	close_button.pressed.connect(_on_close_pressed)
 	footer.add_child(close_button)
 
-## A labelled slider row with a live value readout, wired to `setter`.
-func _make_slider_row(text: String, min_v: float, max_v: float, step: float, value: float, setter: Callable) -> HBoxContainer:
+## A scrollable tab in the TabContainer; returns the VBox to add rows to.
+func _make_tab(tabs: TabContainer, title: String) -> VBoxContainer:
+	var scroll := ScrollContainer.new()
+	scroll.name = title
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	tabs.add_child(scroll)
+	var v := VBoxContainer.new()
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.add_theme_constant_override("separation", 10)
+	scroll.add_child(v)
+	return v
+
+## A labelled slider row with a live value readout (disp_mult/disp_fmt format it).
+func _make_slider_row(text: String, min_v: float, max_v: float, step: float, value: float,
+		setter: Callable, disp_mult: float = 1.0, disp_fmt: String = "%.2f") -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
 	var label := Label.new()
@@ -220,11 +137,43 @@ func _make_slider_row(text: String, min_v: float, max_v: float, step: float, val
 	var value_label := Label.new()
 	value_label.custom_minimum_size = Vector2(56, 0)
 	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	value_label.text = "%.2f" % value
+	value_label.text = disp_fmt % (value * disp_mult)
 	row.add_child(value_label)
 	slider.value_changed.connect(func(v: float) -> void:
 		setter.call(v)
-		value_label.text = "%.2f" % v)
+		value_label.text = disp_fmt % (v * disp_mult))
+	return row
+
+## A labelled toggle (CheckButton) row wired to `setter`.
+func _make_toggle_row(text: String, value: bool, setter: Callable) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	var label := Label.new()
+	label.text = text
+	label.custom_minimum_size = Vector2(200, 0)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(label)
+	var check := CheckButton.new()
+	check.button_pressed = value
+	check.toggled.connect(setter)
+	row.add_child(check)
+	return row
+
+## A labelled dropdown row wired to `setter` (item index).
+func _make_option_row(text: String, items: Array, selected: int, setter: Callable) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	var label := Label.new()
+	label.text = text
+	label.custom_minimum_size = Vector2(200, 0)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(label)
+	var opt := OptionButton.new()
+	for item_name: String in items:
+		opt.add_item(item_name)
+	opt.selected = selected
+	opt.item_selected.connect(setter)
+	row.add_child(opt)
 	return row
 
 func _make_bind_row(action: String) -> HBoxContainer:
@@ -276,14 +225,6 @@ func _cancel_listen() -> void:
 	_listening_action = ""
 	_refresh()
 
-func _on_sensitivity_changed(value: float) -> void:
-	Settings.set_mouse_sensitivity(value)
-	_update_sensitivity_label()
-
-func _on_volume_changed(value: float) -> void:
-	Settings.set_master_volume(value)
-	_update_volume_label()
-
 func _on_reset_pressed() -> void:
 	Settings.reset_to_defaults()
 	_refresh()
@@ -302,13 +243,3 @@ func _is_cancel(event: InputEvent) -> bool:
 func _refresh() -> void:
 	for action in _rebind_buttons:
 		_rebind_buttons[action].text = Settings.binding_label(action)
-	_update_sensitivity_label()
-	_update_volume_label()
-
-func _update_sensitivity_label() -> void:
-	if _sensitivity_value_label:
-		_sensitivity_value_label.text = "%.1f" % (Settings.mouse_sensitivity * 1000.0)
-
-func _update_volume_label() -> void:
-	if _volume_value_label:
-		_volume_value_label.text = "%d%%" % int(round(Settings.master_volume * 100.0))
