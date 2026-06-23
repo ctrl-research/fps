@@ -611,6 +611,11 @@ func _swing() -> void:
 	# blade). d flips it: top-right->down-left, then top-left->down-right.
 	var windup := _sword_rest.rotated_local(Vector3.FORWARD, deg_to_rad(-92.0 * d)).rotated_local(Vector3.RIGHT, deg_to_rad(50.0))
 	windup.origin += Vector3(0.12 * d, 0.10, 0.10)
+	if d > 0.0:
+		# Left-to-right swing: a distinct windup — lift the blade and cock the tip up
+		# to the top-left before sweeping across to the right.
+		windup = _sword_rest.rotated_local(Vector3.FORWARD, deg_to_rad(-60.0)).rotated_local(Vector3.RIGHT, deg_to_rad(45.0))
+		windup.origin += Vector3(-0.04, 0.18, 0.06)
 	var slash := _sword_rest.rotated_local(Vector3.FORWARD, deg_to_rad(92.0 * d)).rotated_local(Vector3.RIGHT, deg_to_rad(-115.0))
 	slash.origin += Vector3(-0.22 * d, -0.14, -0.34)
 	_swing_tween = create_tween()
