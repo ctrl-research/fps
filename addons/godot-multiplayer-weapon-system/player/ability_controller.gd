@@ -438,18 +438,46 @@ func _build_sword() -> void:
 	# tip tilted slightly toward the camera.
 	_sword.position = Vector3(0.28, -0.46, -0.55)
 	_sword.rotation = Vector3(deg_to_rad(12.0), deg_to_rad(0.0), deg_to_rad(-10.0))
-	var steel := Color(0.74, 0.77, 0.82)
-	var dark := Color(0.13, 0.12, 0.14)
-	_add_part(Vector3(0.05, 0.05, 0.05), Vector3(0.0, -0.16, 0.0), dark)        # pommel
-	_add_part(Vector3(0.045, 0.22, 0.045), Vector3(0.0, -0.02, 0.0), dark)       # grip
-	_add_part(Vector3(0.24, 0.045, 0.05), Vector3(0.0, 0.10, 0.0), steel)        # crossguard
-	_add_part(Vector3(0.05, 0.95, 0.018), Vector3(0.0, 0.60, 0.0), steel)        # blade
-	# Both hands grip the handle: right hand on top (near the crossguard), left
-	# hand below it.
-	var skin := Color(0.85, 0.68, 0.55)
-	_add_part(Vector3(0.09, 0.085, 0.1), Vector3(0.0, 0.05, 0.02), skin)         # right hand (top)
-	_add_part(Vector3(0.09, 0.085, 0.1), Vector3(0.0, -0.06, 0.02), skin)        # left hand (bottom)
+	var steel := Color(0.76, 0.79, 0.84)
+	var steel_dk := Color(0.50, 0.52, 0.58)   # fuller / wrap bands (darker steel)
+	var dark := Color(0.12, 0.11, 0.13)        # grip leather
+	var gold := Color(0.72, 0.56, 0.22)        # pommel / guard accents
+
+	# --- Hilt ---
+	_add_part(Vector3(0.078, 0.05, 0.078), Vector3(0.0, -0.17, 0.0), gold)       # pommel core
+	_add_part(Vector3(0.05, 0.035, 0.05), Vector3(0.0, -0.205, 0.0), gold)       # pommel cap
+	_add_part(Vector3(0.05, 0.22, 0.05), Vector3(0.0, -0.03, 0.0), dark)         # grip
+	for gy: float in [-0.10, -0.04, 0.02, 0.08]:
+		_add_part(Vector3(0.056, 0.012, 0.056), Vector3(0.0, gy, 0.0), steel_dk) # wrap bands
+	# Crossguard: wide bar, raised centre block, flared quillon tips.
+	_add_part(Vector3(0.34, 0.05, 0.07), Vector3(0.0, 0.13, 0.0), steel)         # guard bar
+	_add_part(Vector3(0.09, 0.09, 0.09), Vector3(0.0, 0.13, 0.0), gold)          # guard centre
+	_add_part(Vector3(0.05, 0.07, 0.06), Vector3(0.16, 0.16, 0.0), steel, Vector3(0.0, 0.0, 25.0))    # right quillon
+	_add_part(Vector3(0.05, 0.07, 0.06), Vector3(-0.16, 0.16, 0.0), steel, Vector3(0.0, 0.0, -25.0))  # left quillon
+
+	# --- Broadsword blade: wide body with a central fuller and a tapered point ---
+	_add_part(Vector3(0.12, 0.10, 0.05), Vector3(0.0, 0.21, 0.0), steel)         # ricasso (blade base)
+	_add_part(Vector3(0.10, 0.66, 0.025), Vector3(0.0, 0.56, 0.0), steel)        # main blade
+	_add_part(Vector3(0.028, 0.56, 0.03), Vector3(0.0, 0.56, 0.006), steel_dk)   # fuller (centre groove)
+	_add_part(Vector3(0.08, 0.14, 0.022), Vector3(0.0, 0.95, 0.0), steel)        # taper start
+	_add_part(Vector3(0.05, 0.12, 0.02), Vector3(0.0, 1.06, 0.0), steel)         # tip
+	_add_part(Vector3(0.02, 0.08, 0.016), Vector3(0.0, 1.15, 0.0), steel)        # point
+
+	# --- Gauntlets gripping the handle (right hand on top, left below) ---
+	_build_gauntlet(0.05)
+	_build_gauntlet(-0.07)
 	_build_swing_arc()
+
+## An armoured gauntlet gripping the handle at height `gy` (plated back-of-hand,
+## knuckle ridge, finger plates, and a wrist cuff toward the camera).
+func _build_gauntlet(gy: float) -> void:
+	var metal := Color(0.40, 0.42, 0.48)
+	var joint := Color(0.22, 0.23, 0.28)
+	_add_part(Vector3(0.11, 0.075, 0.12), Vector3(0.0, gy, 0.02), metal)         # back-of-hand plate
+	_add_part(Vector3(0.115, 0.02, 0.115), Vector3(0.0, gy + 0.045, 0.02), joint) # knuckle ridge
+	_add_part(Vector3(0.1, 0.05, 0.06), Vector3(0.0, gy - 0.005, 0.085), metal)  # finger plates
+	_add_part(Vector3(0.12, 0.09, 0.1), Vector3(0.0, gy - 0.01, -0.05), metal)   # wrist cuff
+	_add_part(Vector3(0.125, 0.02, 0.105), Vector3(0.0, gy - 0.05, -0.05), joint) # cuff trim
 
 ## A translucent crescent that flashes along the blade's path on each swing.
 func _build_swing_arc() -> void:
