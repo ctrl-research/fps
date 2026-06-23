@@ -76,7 +76,9 @@ var _arc: MeshInstance3D = null        # slash arc effect
 var _arc_mat: StandardMaterial3D = null
 var _arc_tween: Tween = null
 var _orb: MeshInstance3D = null      # mage palm fireball
+var _orb_mat: StandardMaterial3D = null
 var _orb_tween: Tween = null
+var _flames: CPUParticles3D = null
 
 func setup(player: PlayerController, camera: Camera3D, is_local: bool) -> void:
 	_player = player
@@ -91,6 +93,12 @@ func configure(abilities: Array, tags: Dictionary) -> void:
 	_tags = tags.duplicate()
 
 func _process(delta: float) -> void:
+	# Flicker the fireball core: pulse its size and shift orange<->yellow.
+	if _orb != null and _orb_mat != null:
+		var t := float(Time.get_ticks_msec()) * 0.001
+		var n := clampf(0.5 + 0.35 * sin(t * 18.0) + 0.15 * sin(t * 41.0), 0.0, 1.0)
+		_orb.scale = Vector3.ONE * (0.9 + 0.22 * n)
+		_orb_mat.albedo_color = Color(1.0, 0.42, 0.12).lerp(Color(1.0, 0.85, 0.35), n)
 	if _attack_cd > 0.0:
 		_attack_cd -= delta
 	for id in _cooldowns:
@@ -554,12 +562,48 @@ func _build_palm() -> void:
 	# On top of the world like the rest of the viewmodel.
 	glow.no_depth_test = true
 	glow.render_priority = 1
+	_orb_mat = glow
 	_orb.material_override = glow
 	_sword.add_child(_orb)
-	# Gentle hover bob.
+	# Gentle hover bob (the core flickers in _process).
 	_orb_tween = create_tween().set_loops()
 	_orb_tween.tween_property(_orb, "position:y", 0.19, 0.9).set_trans(Tween.TRANS_SINE)
 	_orb_tween.tween_property(_orb, "position:y", 0.13, 0.9).set_trans(Tween.TRANS_SINE)
+
+	# Rising flame particles around the core.
+	_flames = CPUParticles3D.new()
+	_flames.layers = PlayerController.VIEWMODEL_VISUAL_LAYER
+	_flames.amount = 24
+	_flames.lifetime = 0.45
+	_flames.local_coords = true
+	_flames.direction = Vector3(0.0, 1.0, 0.0)
+	_flames.spread = 22.0
+	_flames.gravity = Vector3(0.0, 0.4, 0.0)        # flames rise
+	_flames.initial_velocity_min = 0.25
+	_flames.initial_velocity_max = 0.55
+	_flames.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	_flames.emission_sphere_radius = 0.09
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.14, 0.14)
+	_flames.mesh = quad
+	var sc := Curve.new()                            # grow then shrink to a flame tip
+	sc.add_point(Vector2(0.0, 0.4))
+	sc.add_point(Vector2(0.3, 1.0))
+	sc.add_point(Vector2(1.0, 0.0))
+	_flames.scale_amount_curve = sc
+	var grad := Gradient.new()                       # yellow -> orange -> fade red
+	grad.offsets = PackedFloat32Array([0.0, 0.45, 1.0])
+	grad.colors = PackedColorArray([Color(1.0, 0.9, 0.35, 0.9), Color(1.0, 0.5, 0.12, 0.8), Color(0.6, 0.1, 0.05, 0.0)])
+	_flames.color_ramp = grad
+	var pmat := StandardMaterial3D.new()
+	pmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	pmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	pmat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	pmat.vertex_color_use_as_albedo = true
+	pmat.no_depth_test = true
+	pmat.render_priority = 2
+	_flames.material_override = pmat
+	_orb.add_child(_flames)
 
 func _build_bow() -> void:
 	# A bow held in the lower-right: grip + two angled limbs, string, nocked arrow.
