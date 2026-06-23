@@ -67,12 +67,13 @@ func _refresh() -> void:
 
 ## DayNightSky drives sky exclusion: sentinel pixels render as a smooth gradient
 ## (day/sunset in 0..1) instead of being dithered.
-func set_sky(day: float, sunset: float) -> void:
+func set_sky(day: float, sunset: float, red: float = 0.0) -> void:
 	if _material == null:
 		return
 	_material.set_shader_parameter("sky_enabled", true)
 	_material.set_shader_parameter("sky_day", day)
 	_material.set_shader_parameter("sky_sunset", sunset)
+	_material.set_shader_parameter("sky_red", red)
 
 func clear_sky() -> void:
 	if _material:

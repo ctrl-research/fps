@@ -17,6 +17,7 @@ shader_type sky;
 
 uniform float day_factor = 1.0;     // 1 = day, 0 = night
 uniform float sunset_factor = 0.0;  // peaks at the sunset midpoint
+uniform float red_factor = 0.0;     // 0 = clear, 1 = fully red sky (late rounds)
 
 float hash(vec2 p) {
 	p = fract(p * vec2(123.34, 456.21));
@@ -75,6 +76,12 @@ void sky() {
 		col = mix(col, cloud, c * 0.8);
 	}
 
+	// Late-round redness: blend the whole sky toward a bright red.
+	vec3 red_top = vec3(0.42, 0.04, 0.03);
+	vec3 red_hor = vec3(0.88, 0.13, 0.06);
+	vec3 red_col = mix(red_hor, red_top, pow(up, 0.6));
+	col = mix(col, red_col, red_factor);
+
 	COLOR = col;
 }
 """
@@ -87,6 +94,7 @@ var _env: WorldEnvironment = null
 var _sky_mat: ShaderMaterial = null
 var _day: float = 1.0
 var _sunset: float = 0.0
+var _red: float = 0.0
 
 func _ready() -> void:
 	_sky_mat = ShaderMaterial.new()
@@ -133,18 +141,20 @@ func _apply_background() -> void:
 	if Settings.stylize_enabled:
 		_env.environment.background_mode = Environment.BG_COLOR
 		_env.environment.background_color = SENTINEL
-		PostProcess.set_sky(_day, _sunset)
+		PostProcess.set_sky(_day, _sunset, _red)
 	else:
 		_env.environment.background_mode = Environment.BG_SKY
 		PostProcess.clear_sky()
 
-## Set the time of day from match progress (0 day → 0.5 sunset → 1 night). Only
-## the sky backdrop colour changes now — the world is lit by the POV light.
-func apply(progress: float) -> void:
+## Set the sky from match progress (time-of-day) and redness (0 clear → 1 fully
+## red, ramped by round). The world is lit by the POV light; this is the backdrop.
+func apply(progress: float, red: float = 0.0) -> void:
 	progress = clampf(progress, 0.0, 1.0)
 	_day = clampf(1.0 - progress, 0.05, 1.0)
 	_sunset = clampf(1.0 - absf(progress - 0.5) * 2.0, 0.0, 1.0)
+	_red = clampf(red, 0.0, 1.0)
 	_sky_mat.set_shader_parameter("day_factor", _day)
 	_sky_mat.set_shader_parameter("sunset_factor", _sunset)
+	_sky_mat.set_shader_parameter("red_factor", _red)
 	if Settings.stylize_enabled:
-		PostProcess.set_sky(_day, _sunset)
+		PostProcess.set_sky(_day, _sunset, _red)
