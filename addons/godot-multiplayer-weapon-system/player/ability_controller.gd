@@ -601,28 +601,22 @@ func _swing() -> void:
 	if _swing_tween and _swing_tween.is_valid():
 		_swing_tween.kill()
 	_sword.transform = _sword_rest
-	# Forward chop toward screen centre, alternating the cock side each swing: the
-	# blade winds up out to one side (raised back) then drives forward/inward to the
-	# centre (pitched toward the crosshair). _swing_dir flips the windup side.
-	var d := _swing_dir
-	# Windup cocks up to a top corner (raised + rolled to one side); the slash drives
-	# the tip forward and diagonally DOWN past the crosshair to the opposite side
-	# (strong forward pitch + roll across + a forward/down/across lunge of the whole
-	# blade). d flips it: top-right->down-left, then top-left->down-right.
-	var windup := _sword_rest.rotated_local(Vector3.FORWARD, deg_to_rad(-92.0 * d)).rotated_local(Vector3.RIGHT, deg_to_rad(50.0))
-	windup.origin += Vector3(0.12 * d, 0.10, 0.10)
-	if d > 0.0:
-		# Left-to-right swing: a distinct windup — lift the blade and cock the tip up
-		# to the top-left before sweeping across to the right.
-		windup = _sword_rest.rotated_local(Vector3.FORWARD, deg_to_rad(-60.0)).rotated_local(Vector3.RIGHT, deg_to_rad(45.0))
-		windup.origin += Vector3(-0.04, 0.18, 0.06)
-	var slash := _sword_rest.rotated_local(Vector3.FORWARD, deg_to_rad(92.0 * d)).rotated_local(Vector3.RIGHT, deg_to_rad(-115.0))
-	slash.origin += Vector3(-0.22 * d, -0.14, -0.34)
+	# A mirrored diagonal pair. s = +1: windup top-RIGHT, slash to bottom-LEFT.
+	# s = -1: windup top-LEFT, slash to bottom-RIGHT. The windup IS the transition
+	# that tilts the blade up to the opposite top corner between swings.
+	var s := _swing_dir
+	# Windup: cock the tip UP to the top corner on the start side (raised + rolled).
+	var windup := _sword_rest.rotated_local(Vector3.FORWARD, deg_to_rad(75.0 * s)).rotated_local(Vector3.RIGHT, deg_to_rad(45.0))
+	windup.origin += Vector3(0.12 * s, 0.16, 0.08)
+	# Slash: drive the tip forward and DOWN past the crosshair to the opposite
+	# bottom corner.
+	var slash := _sword_rest.rotated_local(Vector3.FORWARD, deg_to_rad(-78.0 * s)).rotated_local(Vector3.RIGHT, deg_to_rad(-112.0))
+	slash.origin += Vector3(-0.22 * s, -0.13, -0.32)
 	_swing_tween = create_tween()
-	_swing_tween.tween_property(_sword, "transform", windup, 0.10)
+	_swing_tween.tween_property(_sword, "transform", windup, 0.11)
 	_swing_tween.tween_property(_sword, "transform", slash, 0.15)
 	_swing_tween.tween_property(_sword, "transform", _sword_rest, 0.20)
-	_flash_arc(d)
+	_flash_arc(s)
 	_swing_dir = -_swing_dir
 
 ## Sweep the crescent arc along the blade's path (in the attack direction) and
