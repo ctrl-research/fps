@@ -16,6 +16,8 @@ signal defeated(by_peer_id: int)
 @export var max_health: float = 100.0
 ## Odd id so the minimap colours the bot as the enemy team (peer_id % 2 == 1).
 @export var authority_peer_id: int = 1001
+## Optional class identity (warrior / mage / archer) — picks the matching model.
+@export var class_id: String = ""
 
 const GRAVITY: float = 20.0
 const RESPAWN_DELAY: float = 5.0
@@ -73,7 +75,10 @@ func _ready() -> void:
 
 	_model = CharacterModel.new()
 	add_child(_model)
-	_model.setup(BOT_MODEL)
+	var model_path := BOT_MODEL
+	if class_id != "":
+		model_path = String(ClassDatabase.get_def(class_id).get("model", BOT_MODEL))
+	_model.setup(model_path)
 	_model.set_tint(CategoryColors.ENEMY)
 
 	_reset()

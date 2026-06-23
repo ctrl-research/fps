@@ -23,8 +23,8 @@ const CROSSHAIR_STYLES: Array[String] = ["Cross", "Dot", "Circle", "X", "Star"]
 ## contrast so the dither spans the full tonal range (lit *and* shaded surfaces).
 const DEFAULT_DITHER_SHADE: float = 0.50     # shadow tone brightness (visibility)
 const DEFAULT_DITHER_LIT: float = 0.95       # lit tone brightness
-const DEFAULT_DITHER_LOW: float = 0.02       # dither range start
-const DEFAULT_DITHER_HIGH: float = 0.90      # dither range end
+const DEFAULT_DITHER_LOW: float = 0.20       # dither range start
+const DEFAULT_DITHER_HIGH: float = 0.32      # dither range end
 const DEFAULT_DITHER_GRAIN: float = 2.0      # dither grain size in pixels
 const DEFAULT_DITHER_CONTRAST: float = 1.4   # how sharply lit/shade split
 const MAX_DITHER_CONTRAST: float = 4.0
@@ -36,13 +36,13 @@ const DEFAULT_POV_ENERGY: float = 2.0
 const MAX_POV_ENERGY: float = 8.0
 
 ## Ambient light: base visibility so the whole scene is readable.
-const DEFAULT_AMBIENT: float = 0.70
+const DEFAULT_AMBIENT: float = 0.50
 const MAX_AMBIENT: float = 1.5
 
 ## Viewmodel key light (its own light, separate from the world).
-const DEFAULT_VM_ENERGY: float = 3.0
+const DEFAULT_VM_ENERGY: float = 1.40
 const MAX_VM_ENERGY: float = 8.0
-const DEFAULT_VM_PITCH: float = -50.0    # degrees; steeper = shadow lower on the model
+const DEFAULT_VM_PITCH: float = 0.0    # degrees; steeper = shadow lower on the model
 
 ## Actions exposed in the rebinding UI, in display order.
 const BINDABLE_ACTIONS: Array[String] = [
