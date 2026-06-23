@@ -484,14 +484,14 @@ func _build_swing_arc() -> void:
 	_arc = MeshInstance3D.new()
 	_arc.mesh = _make_arc_mesh()
 	_arc.layers = PlayerController.VIEWMODEL_VISUAL_LAYER
-	_arc.position = Vector3(0.0, 0.0, -0.95)   # at the crosshair, out in front
+	_arc.position = Vector3(0.0, 0.0, -1.0)   # at the crosshair, out in front
+	# Opaque + unshaded: a solid colour that fully overwrites whatever is behind it,
+	# so the arc never blends with the magenta sky sentinel (which made it pink).
 	_arc_mat = StandardMaterial3D.new()
 	_arc_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_arc_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_arc_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 	_arc_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_arc_mat.no_depth_test = true
-	_arc_mat.albedo_color = Color(1.0, 1.0, 1.0, 0.0)
+	_arc_mat.albedo_color = Color(0.95, 0.97, 1.0)
 	_arc.material_override = _arc_mat
 	_arc.visible = false
 	_camera.add_child(_arc)
@@ -501,11 +501,11 @@ func _build_swing_arc() -> void:
 func _make_arc_mesh() -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var segments := 22
-	var a0 := deg_to_rad(48.0)    # spans 48°..132°, centred on 90° (+Y / up)
-	var a1 := deg_to_rad(132.0)
-	var r_mid := 0.6
-	var width := 0.17
+	var segments := 26
+	var a0 := deg_to_rad(28.0)    # wide arc spanning 28°..152°, centred on 90° (+Y)
+	var a1 := deg_to_rad(152.0)
+	var r_mid := 0.72
+	var width := 0.16
 	for i in segments:
 		var t0 := float(i) / float(segments)
 		var t1 := float(i + 1) / float(segments)
@@ -605,14 +605,17 @@ func _swing() -> void:
 	# blade winds up out to one side (raised back) then drives forward/inward to the
 	# centre (pitched toward the crosshair). _swing_dir flips the windup side.
 	var d := _swing_dir
-	# Big diagonal: windup cocks to a top corner (raised + rolled to one side),
-	# slash drives to the opposite bottom corner (pitched forward/down + rolled
-	# across). d flips the corners: top-right->bottom-left, then top-left->bottom-right.
-	var windup := _sword_rest.rotated_local(Vector3.FORWARD, deg_to_rad(-65.0 * d)).rotated_local(Vector3.RIGHT, deg_to_rad(40.0))
-	var slash := _sword_rest.rotated_local(Vector3.FORWARD, deg_to_rad(65.0 * d)).rotated_local(Vector3.RIGHT, deg_to_rad(-85.0))
+	# Windup cocks up to a top corner (raised + rolled to one side); the slash drives
+	# the tip forward and diagonally DOWN past the crosshair to the opposite side
+	# (strong forward pitch + roll across + a forward/down/across lunge of the whole
+	# blade). d flips it: top-right->down-left, then top-left->down-right.
+	var windup := _sword_rest.rotated_local(Vector3.FORWARD, deg_to_rad(-72.0 * d)).rotated_local(Vector3.RIGHT, deg_to_rad(38.0))
+	windup.origin += Vector3(0.06 * d, 0.05, 0.06)
+	var slash := _sword_rest.rotated_local(Vector3.FORWARD, deg_to_rad(72.0 * d)).rotated_local(Vector3.RIGHT, deg_to_rad(-98.0))
+	slash.origin += Vector3(-0.12 * d, -0.06, -0.2)
 	_swing_tween = create_tween()
 	_swing_tween.tween_property(_sword, "transform", windup, 0.08)
-	_swing_tween.tween_property(_sword, "transform", slash, 0.11)
+	_swing_tween.tween_property(_sword, "transform", slash, 0.12)
 	_swing_tween.tween_property(_sword, "transform", _sword_rest, 0.18)
 	_flash_arc(d)
 	_swing_dir = -_swing_dir
@@ -624,18 +627,15 @@ func _flash_arc(d: float) -> void:
 		return
 	if _arc_tween and _arc_tween.is_valid():
 		_arc_tween.kill()
-	# Tilt the crescent forward (into the screen) so it reads as a 3D arc out at the
-	# crosshair, and sweep it diagonally from the windup corner to the slash corner
-	# (matching the swing), growing and fading.
-	var tilt := deg_to_rad(-35.0)              # lean the arc into the screen
-	_arc.rotation = Vector3(tilt, 0.0, deg_to_rad(65.0 * d))
-	_arc.scale = Vector3(0.85, 0.85, 0.85)
-	_arc_mat.albedo_color = Color(1.0, 1.0, 1.0, 0.6)
+	# Facing the camera (the player's forward view), centred on the crosshair, the
+	# wide crescent sweeps across in the swing direction and grows, then vanishes.
+	# Opaque, so its colour is consistent over the world or the sky.
+	_arc.rotation = Vector3(0.0, 0.0, deg_to_rad(-50.0 * d))
+	_arc.scale = Vector3(0.8, 0.8, 0.8)
 	_arc.visible = true
 	_arc_tween = create_tween().set_parallel(true)
-	_arc_tween.tween_property(_arc, "rotation:z", deg_to_rad(-65.0 * d), 0.2)
-	_arc_tween.tween_property(_arc, "scale", Vector3(1.3, 1.3, 1.3), 0.2)
-	_arc_tween.tween_property(_arc_mat, "albedo_color", Color(1.0, 1.0, 1.0, 0.0), 0.24)
+	_arc_tween.tween_property(_arc, "rotation:z", deg_to_rad(50.0 * d), 0.18)
+	_arc_tween.tween_property(_arc, "scale", Vector3(1.35, 1.35, 1.35), 0.18)
 	_arc_tween.chain().tween_callback(func() -> void: _arc.visible = false)
 
 ## A forward jab (spell cast), returning to rest.
