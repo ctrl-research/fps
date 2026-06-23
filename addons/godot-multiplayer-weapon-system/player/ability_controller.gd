@@ -601,11 +601,12 @@ func _swing() -> void:
 	if _swing_tween and _swing_tween.is_valid():
 		_swing_tween.kill()
 	_sword.transform = _sword_rest
-	# Horizontal sweep across the screen, alternating each swing: the blade rolls
-	# from one side (windup) to the other (slash). _swing_dir flips it right<->left.
+	# Forward chop toward screen centre, alternating the cock side each swing: the
+	# blade winds up out to one side (raised back) then drives forward/inward to the
+	# centre (pitched toward the crosshair). _swing_dir flips the windup side.
 	var d := _swing_dir
-	var windup := _sword_rest.rotated_local(Vector3.RIGHT, deg_to_rad(10.0)).rotated_local(Vector3.FORWARD, deg_to_rad(80.0 * d))
-	var slash := _sword_rest.rotated_local(Vector3.RIGHT, deg_to_rad(-15.0)).rotated_local(Vector3.FORWARD, deg_to_rad(-80.0 * d))
+	var windup := _sword_rest.rotated_local(Vector3.RIGHT, deg_to_rad(22.0)).rotated_local(Vector3.FORWARD, deg_to_rad(55.0 * d))
+	var slash := _sword_rest.rotated_local(Vector3.RIGHT, deg_to_rad(-72.0)).rotated_local(Vector3.FORWARD, deg_to_rad(-12.0 * d))
 	_swing_tween = create_tween()
 	_swing_tween.tween_property(_sword, "transform", windup, 0.08)
 	_swing_tween.tween_property(_sword, "transform", slash, 0.11)
@@ -620,12 +621,15 @@ func _flash_arc(d: float) -> void:
 		return
 	if _arc_tween and _arc_tween.is_valid():
 		_arc_tween.kill()
-	# Start cocked to one side, sweep to the other (same direction as the swing).
-	_arc.rotation = Vector3(0.0, 0.0, deg_to_rad(-60.0 * d))
+	# Start cocked to the windup side, then sweep inward to centre while growing
+	# (reads as the slash driving forward toward the crosshair), and fade.
+	_arc.rotation = Vector3(0.0, 0.0, deg_to_rad(-55.0 * d))
+	_arc.scale = Vector3(0.85, 0.85, 0.85)
 	_arc_mat.albedo_color = Color(1.0, 1.0, 1.0, 0.6)
 	_arc.visible = true
 	_arc_tween = create_tween().set_parallel(true)
-	_arc_tween.tween_property(_arc, "rotation:z", deg_to_rad(60.0 * d), 0.2)
+	_arc_tween.tween_property(_arc, "rotation:z", 0.0, 0.2)
+	_arc_tween.tween_property(_arc, "scale", Vector3(1.2, 1.2, 1.2), 0.2)
 	_arc_tween.tween_property(_arc_mat, "albedo_color", Color(1.0, 1.0, 1.0, 0.0), 0.24)
 	_arc_tween.chain().tween_callback(func() -> void: _arc.visible = false)
 
