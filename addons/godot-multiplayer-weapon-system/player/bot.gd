@@ -47,6 +47,15 @@ var health: float = 0.0
 var _dead: bool = false
 var _respawn_timer: float = 0.0
 var _attack_timer: float = 0.0
+# Class-derived combat behaviour (set from class_id in _configure_class).
+var _ranged: bool = false
+var _attack_range: float = MELEE_RANGE
+var _keep_dist: float = 0.0
+var _attack_interval: float = ATTACK_INTERVAL
+var _proj_damage: float = 0.0
+var _proj_speed: float = 40.0
+var _proj_aoe: float = 0.0
+var _proj_color: Color = Color(1.0, 0.6, 0.3)
 var _hit_flash_timer: float = 0.0
 var _material: StandardMaterial3D = null
 var _spawn_position: Vector3 = Vector3.ZERO
@@ -81,7 +90,35 @@ func _ready() -> void:
 	_model.setup(model_path)
 	_model.set_tint(CategoryColors.ENEMY)
 
+	_configure_class()
 	_reset()
+
+## Set combat behaviour from the bot's class: warriors melee, mage/archer kite
+## and fire projectiles.
+func _configure_class() -> void:
+	match class_id:
+		"mage":
+			_ranged = true
+			_attack_range = 22.0
+			_keep_dist = 11.0
+			_attack_interval = 1.4
+			_proj_damage = 12.0
+			_proj_speed = 30.0
+			_proj_aoe = 1.8
+			_proj_color = Color(1.0, 0.5, 0.2)
+		"archer":
+			_ranged = true
+			_attack_range = 28.0
+			_keep_dist = 13.0
+			_attack_interval = 1.1
+			_proj_damage = 14.0
+			_proj_speed = 60.0
+			_proj_aoe = 0.0
+			_proj_color = Color(0.85, 0.78, 0.55)
+		_:
+			_ranged = false
+			_attack_range = MELEE_RANGE
+			_attack_interval = ATTACK_INTERVAL
 
 func _physics_process(delta: float) -> void:
 	if _dead:
@@ -107,20 +144,28 @@ func _physics_process(delta: float) -> void:
 		move_and_slide()
 		return
 
-	# Chase the nearest visible player; strike when in melee range.
+	# Engage the nearest visible player. Melee bots close in; ranged bots hold at
+	# their attack range, back off if crowded, and fire projectiles.
 	var target := _find_target()
 	var move := Vector3.ZERO
 	if target != null:
 		_face(target)
 		var to := target.global_position - global_position
 		to.y = 0.0
-		if to.length() > MELEE_RANGE:
-			move = to.normalized() * MOVE_SPEED / maxf(_slow_factor, 0.01)
-		else:
+		var dist := to.length()
+		var speed := MOVE_SPEED / maxf(_slow_factor, 0.01)
+		if dist > _attack_range:
+			move = to.normalized() * speed                      # close in
+		elif _ranged and dist < _keep_dist:
+			move = -to.normalized() * speed                     # kite away
+		if dist <= _attack_range:
 			_attack_timer -= delta
 			if _attack_timer <= 0.0:
-				_attack_timer = ATTACK_INTERVAL * stat_fire_rate_mult * _slow_factor
-				_melee_attack(target)
+				_attack_timer = _attack_interval * stat_fire_rate_mult * _slow_factor
+				if _ranged:
+					_ranged_attack(target)
+				else:
+					_melee_attack(target)
 	velocity.x = move.x
 	velocity.z = move.z
 	move_and_slide()
@@ -233,6 +278,23 @@ func _melee_attack(target: PlayerController) -> void:
 	GameAudio.play_at(global_position, "swing", "movement")
 	if is_instance_valid(target) and global_position.distance_to(target.global_position) <= MELEE_RANGE + 0.6:
 		target.request_damage(MELEE_DAMAGE * stat_damage_mult, authority_peer_id)
+
+## Ranged strike (mage/archer): fire a projectile at the target.
+func _ranged_attack(target: PlayerController) -> void:
+	if not is_instance_valid(target):
+		return
+	GameAudio.play_at(global_position, "swing", "movement")
+	var origin := _eye.global_position if _eye else global_position + Vector3.UP * 1.4
+	var aim := target.global_position + Vector3.UP * 1.0
+	var proj := MagicProjectile.new()
+	proj.damage = _proj_damage * stat_damage_mult
+	proj.aoe_radius = _proj_aoe
+	proj.color = _proj_color
+	proj.speed = _proj_speed
+	proj.attacker_id = authority_peer_id
+	proj.shooter = self
+	get_parent().add_child(proj)
+	proj.launch(origin, (aim - origin).normalized())
 
 func _update_color() -> void:
 	_material.albedo_color = Color(0.8, 0.3, 0.3)
