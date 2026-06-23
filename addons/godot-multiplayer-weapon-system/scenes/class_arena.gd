@@ -228,10 +228,13 @@ func _spawn_player() -> void:
 
 func _spawn_bots() -> void:
 	var scene: PackedScene = load(BOT_SCENE)
-	for index in _bot_spawns.size():
+	# One bot of each class on the enemy team.
+	var bot_classes: Array[String] = ["warrior", "mage", "archer"]
+	for index in bot_classes.size():
 		var bot: Bot = scene.instantiate()
 		bot.authority_peer_id = 1001 + index * 2
 		bot.auto_respawn = false
+		bot.class_id = bot_classes[index]
 		bot.position = _bot_spawns[index]
 		add_child(bot)
 		bot.defeated.connect(_on_bot_defeated)
