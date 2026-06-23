@@ -627,10 +627,12 @@ func _flash_arc(d: float) -> void:
 		return
 	if _arc_tween and _arc_tween.is_valid():
 		_arc_tween.kill()
-	# Facing the camera (the player's forward view), centred on the crosshair, the
-	# wide crescent sweeps across in the swing direction and grows, then vanishes.
-	# Opaque, so its colour is consistent over the world or the sky.
-	_arc.rotation = Vector3(0.0, 0.0, deg_to_rad(-50.0 * d))
+	# Centred on the crosshair and TILTED FORWARD (leaning into the screen) so the
+	# crescent reads as a 3D arc out in front, not a flat decal. It sweeps across in
+	# the swing direction and grows, then vanishes. Opaque, so the colour is
+	# consistent over the world or the sky.
+	var tilt := deg_to_rad(-42.0)              # lean the top of the arc into the screen
+	_arc.rotation = Vector3(tilt, 0.0, deg_to_rad(-50.0 * d))
 	_arc.scale = Vector3(0.8, 0.8, 0.8)
 	_arc.visible = true
 	_arc_tween = create_tween().set_parallel(true)
