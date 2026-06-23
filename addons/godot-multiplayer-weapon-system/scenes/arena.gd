@@ -28,7 +28,12 @@ const SPAWN_Z := 40.0
 
 const STRUCTURE_COLOR := Color(0.32, 0.30, 0.34)
 
+# Procedural stone-brick textures (generated once, shared by all map materials).
+var _brick_albedo: ImageTexture = null
+var _brick_normal: ImageTexture = null
+
 func _ready() -> void:
+	_make_brick_textures()
 	_build_ground()
 	_build_center()
 	_build_flanks()
@@ -36,6 +41,76 @@ func _ready() -> void:
 	_build_cover()
 	_build_decoration()
 	_build_torches()
+	_build_wall_detail()
+
+# === Stone-brick texturing ===
+
+## Generate a tiling stone-brick albedo + normal map procedurally (no assets, no
+## runtime shader). Relief from the mortar grooves gives the dither micro-variation
+## to read across otherwise-flat surfaces.
+func _make_brick_textures() -> void:
+	var size := 128
+	var bw := 32.0      # brick width / height in texels (divide 128 evenly to tile)
+	var bh := 16.0
+	var mortar := 3.0
+	var albedo := Image.create(size, size, false, Image.FORMAT_RGB8)
+	var normal := Image.create(size, size, false, Image.FORMAT_RGB8)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 20260622
+	for y in size:
+		var row := floori(float(y) / bh)
+		var ox := bw * 0.5 if row % 2 == 1 else 0.0
+		for x in size:
+			var fx := fposmod(float(x) + ox, bw)
+			var fy := fposmod(float(y), bh)
+			var in_mortar := fx < mortar or fy < mortar
+			# Groove gradient -> normal tilt at the mortar edges.
+			var gx := 0.0
+			var gy := 0.0
+			if fx < mortar: gx = -(1.0 - fx / mortar)
+			elif fx > bw - mortar: gx = (1.0 - (bw - fx) / mortar)
+			if fy < mortar: gy = -(1.0 - fy / mortar)
+			elif fy > bh - mortar: gy = (1.0 - (bh - fy) / mortar)
+			var speck := (rng.randf() - 0.5) * 0.12
+			var base := (0.46 if in_mortar else 0.86) + speck
+			albedo.set_pixel(x, y, Color(base, base, base))
+			var n := Vector3(gx * 0.8 + speck * 0.5, gy * 0.8 + speck * 0.5, 1.0).normalized()
+			normal.set_pixel(x, y, Color(n.x * 0.5 + 0.5, n.y * 0.5 + 0.5, n.z * 0.5 + 0.5))
+	_brick_albedo = ImageTexture.create_from_image(albedo)
+	_brick_normal = ImageTexture.create_from_image(normal)
+
+## A grey stone-brick material (triplanar so bricks are a consistent size on every
+## box face and angle, regardless of the box's dimensions).
+func _stone_material(color: Color) -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = CategoryColors.to_map_grey(color)
+	mat.roughness = 0.95
+	if _brick_albedo != null:
+		mat.albedo_texture = _brick_albedo
+		mat.normal_enabled = true
+		mat.normal_texture = _brick_normal
+		mat.normal_scale = 1.4
+		mat.uv1_triplanar = true
+		mat.uv1_world_triplanar = true
+		mat.uv1_scale = Vector3(0.32, 0.32, 0.32)
+	return mat
+
+## Pilasters / buttresses protruding from the perimeter walls — more faces and
+## angles to catch the light and the dither.
+func _build_wall_detail() -> void:
+	var hw := GROUND.x * 0.5
+	var hl := GROUND.y * 0.5
+	var h := 4.0
+	var zx := -hw + 6.0
+	while zx <= hw - 6.0:
+		_box(Vector3(zx, h * 0.5, hl - 0.7), Vector3(1.4, h, 1.0), STRUCTURE_COLOR)
+		_box(Vector3(zx, h * 0.5, -hl + 0.7), Vector3(1.4, h, 1.0), STRUCTURE_COLOR)
+		zx += 9.0
+	var xz := -hl + 8.0
+	while xz <= hl - 8.0:
+		_box(Vector3(hw - 0.7, h * 0.5, xz), Vector3(1.0, h, 1.4), STRUCTURE_COLOR)
+		_box(Vector3(-hw + 0.7, h * 0.5, xz), Vector3(1.0, h, 1.4), STRUCTURE_COLOR)
+		xz += 10.0
 
 # === Spawns ===
 
@@ -161,9 +236,7 @@ func _box(pos: Vector3, size: Vector3, color: Color) -> void:
 	var box := BoxMesh.new()
 	box.size = size
 	mesh.mesh = box
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = CategoryColors.to_map_grey(color)
-	mesh.material_override = mat
+	mesh.material_override = _stone_material(color)
 	body.add_child(mesh)
 	add_child(body)
 
@@ -181,9 +254,7 @@ func _ramp(pos: Vector3, size: Vector3, pitch_deg: float) -> void:
 	var box := BoxMesh.new()
 	box.size = size
 	mesh.mesh = box
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = CategoryColors.to_map_grey(STRUCTURE_COLOR)
-	mesh.material_override = mat
+	mesh.material_override = _stone_material(STRUCTURE_COLOR)
 	body.add_child(mesh)
 	add_child(body)
 
