@@ -27,6 +27,7 @@ const TEAM_LABELS: Array[String] = ["Team A", "Team B"]
 var _player: PlayerController = null
 
 var _health_bar: ProgressBar = null
+var _health_fill: StyleBoxFlat = null
 var _health_label: Label = null
 var _grenades_box: HBoxContainer = null
 var _equipment_label: Label = null
@@ -114,6 +115,15 @@ func _build_ui() -> void:
 	_health_bar.min_value = 0.0
 	_health_bar.max_value = 100.0
 	_health_bar.show_percentage = false
+	# Opaque styleboxes (the default ProgressBar theme is semi-transparent).
+	var hp_bg := StyleBoxFlat.new()
+	hp_bg.bg_color = Color(0.09, 0.10, 0.13)
+	hp_bg.set_corner_radius_all(3)
+	_health_bar.add_theme_stylebox_override("background", hp_bg)
+	_health_fill = StyleBoxFlat.new()
+	_health_fill.bg_color = Color(0.3, 0.85, 0.4)
+	_health_fill.set_corner_radius_all(3)
+	_health_bar.add_theme_stylebox_override("fill", _health_fill)
 	health_row.add_child(_health_bar)
 	_health_label = Label.new()
 	_health_label.custom_minimum_size = Vector2(48, 0)
@@ -295,9 +305,9 @@ func _on_health_changed(current: float, maximum: float) -> void:
 	_health_bar.value = current
 	_health_label.text = "%d" % int(round(current))
 	var ratio: float = current / maxf(maximum, 1.0)
-	_health_bar.modulate = Color(1.0, 1.0, 1.0)
-	# Tint the fill from green (full) to red (low).
-	_health_bar.self_modulate = Color(1.0 - ratio * 0.7, 0.3 + ratio * 0.7, 0.3)
+	# Tint the (opaque) fill from green (full) to red (low).
+	if _health_fill:
+		_health_fill.bg_color = Color(1.0 - ratio * 0.7, 0.3 + ratio * 0.7, 0.3, 1.0)
 
 func _on_downed() -> void:
 	_status_label.text = "DOWNED"
