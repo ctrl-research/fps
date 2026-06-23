@@ -44,6 +44,15 @@ func _process(_delta: float) -> void:
 	var cam := get_viewport().get_camera_3d()
 	if _rect != null:
 		_rect.visible = Settings.stylize_enabled and cam != null
+	# Feed the camera ray basis so the shader can reconstruct the sky (with clouds).
+	if _material != null and cam != null:
+		var b := cam.global_transform.basis
+		_material.set_shader_parameter("cam_basis_x", b.x)
+		_material.set_shader_parameter("cam_basis_y", b.y)
+		_material.set_shader_parameter("cam_basis_z", b.z)
+		_material.set_shader_parameter("cam_tan", tan(deg_to_rad(cam.fov) * 0.5))
+		var sz := get_viewport().get_visible_rect().size
+		_material.set_shader_parameter("cam_aspect", sz.x / maxf(sz.y, 1.0))
 
 ## Push the live-tunable dither params from Settings into the shader.
 func _refresh() -> void:
