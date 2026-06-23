@@ -31,7 +31,7 @@ theme_override_constants/separation = 16
 
 [node name="Title" type="Label" parent="MenuPanel/Margin/VBox"]
 layout_mode = 2
-text = "TACTICAL EXTRACTION"
+text = "MEDIEVAL-UTION"
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 28
 
@@ -43,25 +43,6 @@ layout_mode = 2
 text = "Disconnected"
 horizontal_alignment = 1
 theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
-
-[node name="HostButton" type="Button" parent="MenuPanel/Margin/VBox"]
-layout_mode = 2
-text = "Host Game"
-maximum_size = Vector2(300, 0)
-
-[node name="JoinSection" type="HBoxContainer" parent="MenuPanel/Margin/VBox"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="IPInput" type="LineEdit" parent="MenuPanel/Margin/VBox/JoinSection"]
-layout_mode = 2
-size_flags_horizontal = 3
-placeholder_text = "Server IP address"
-max_length = 64
-
-[node name="JoinButton" type="Button" parent="MenuPanel/Margin/VBox/JoinSection"]
-layout_mode = 2
-text = "Join"
 
 [node name="TutorialButton" type="Button" parent="MenuPanel/Margin/VBox"]
 layout_mode = 2
@@ -78,12 +59,9 @@ layout_mode = 2
 text = "Round Test (debug)"
 maximum_size = Vector2(300, 0)
 
-[node name="OnlineSeparator" type="HSeparator" parent="MenuPanel/Margin/VBox"]
-layout_mode = 2
-
 [node name="HostOnlineButton" type="Button" parent="MenuPanel/Margin/VBox"]
 layout_mode = 2
-text = "Host Online"
+text = "Host Game"
 maximum_size = Vector2(300, 0)
 
 [node name="JoinOnlineSection" type="HBoxContainer" parent="MenuPanel/Margin/VBox"]
@@ -98,7 +76,7 @@ max_length = 8
 
 [node name="JoinOnlineButton" type="Button" parent="MenuPanel/Margin/VBox/JoinOnlineSection"]
 layout_mode = 2
-text = "Join Online"
+text = "Join Game"
 
 [node name="RoomCodeLabel" type="Label" parent="MenuPanel/Margin/VBox"]
 layout_mode = 2

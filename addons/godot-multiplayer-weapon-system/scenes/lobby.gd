@@ -5,12 +5,7 @@ Shown at startup and when disconnected. Manages connection state display.
 """
 
 @onready var status_label: Label = $MenuPanel/Margin/VBox/StatusLabel
-@onready var host_button: Button = $MenuPanel/Margin/VBox/HostButton
-@onready var join_section: HBoxContainer = $MenuPanel/Margin/VBox/JoinSection
-@onready var ip_input: LineEdit = $MenuPanel/Margin/VBox/JoinSection/IPInput
-@onready var join_button: Button = $MenuPanel/Margin/VBox/JoinSection/JoinButton
 @onready var tutorial_button: Button = $MenuPanel/Margin/VBox/TutorialButton
-var _evolution_button: Button = null
 var _class_arena_button: Button = null
 var _respec_check: CheckButton = null
 @onready var settings_button: Button = $MenuPanel/Margin/VBox/SettingsButton
@@ -19,7 +14,6 @@ var _respec_check: CheckButton = null
 @onready var player_list_label: Label = $MenuPanel/Margin/VBox/PlayerListLabel
 @onready var player_list: VBoxContainer = $MenuPanel/Margin/VBox/PlayerList
 @onready var start_button: Button = $MenuPanel/Margin/VBox/StartButton
-@onready var online_separator: HSeparator = $MenuPanel/Margin/VBox/OnlineSeparator
 @onready var host_online_button: Button = $MenuPanel/Margin/VBox/HostOnlineButton
 @onready var join_online_section: HBoxContainer = $MenuPanel/Margin/VBox/JoinOnlineSection
 @onready var room_code_input: LineEdit = $MenuPanel/Margin/VBox/JoinOnlineSection/RoomCodeInput
@@ -30,13 +24,11 @@ var _port: int = 42069
 
 func _ready() -> void:
 	# Connect button signals
-	host_button.pressed.connect(_on_host_pressed)
-	join_button.pressed.connect(_on_join_pressed)
 	tutorial_button.pressed.connect(_on_tutorial_pressed)
 
-	# Class Arena — the core mode of the pivot (offline vs bots for now).
+	# Play (vs bots) — the core offline mode.
 	_class_arena_button = Button.new()
-	_class_arena_button.text = "Class Arena (vs bots)"
+	_class_arena_button.text = "Play (vs bots)"
 	tutorial_button.get_parent().add_child(_class_arena_button)
 	tutorial_button.get_parent().move_child(_class_arena_button, tutorial_button.get_index() + 1)
 	_class_arena_button.pressed.connect(_on_class_arena_pressed)
@@ -47,12 +39,6 @@ func _ready() -> void:
 	tutorial_button.get_parent().add_child(_respec_check)
 	tutorial_button.get_parent().move_child(_respec_check, _class_arena_button.get_index() + 1)
 
-	# Evolution (old modifier-vote mode) kept as reference, after Class Arena.
-	_evolution_button = Button.new()
-	_evolution_button.text = "Evolution (vs bots)"
-	tutorial_button.get_parent().add_child(_evolution_button)
-	tutorial_button.get_parent().move_child(_evolution_button, _class_arena_button.get_index() + 1)
-	_evolution_button.pressed.connect(_on_evolution_pressed)
 	settings_button.pressed.connect(_on_settings_pressed)
 	round_test_button.pressed.connect(_on_round_test_pressed)
 	host_online_button.pressed.connect(_on_host_online_pressed)
@@ -79,26 +65,6 @@ func _input(event: InputEvent) -> void:
 		if MultiplayerManager.current_state != MultiplayerManager.ConnectionState.DISCONNECTED:
 			MultiplayerManager.disconnect_session()
 
-func _on_host_pressed() -> void:
-	var err = MultiplayerManager.start_host(_port)
-	if err != OK:
-		status_label.text = "Failed to host: port may be in use"
-		return
-	status_label.text = "Hosting on port %d..." % _port
-	_set_buttons_connected(true)
-
-func _on_join_pressed() -> void:
-	var ip = ip_input.text.strip_edges()
-	if ip.is_empty():
-		status_label.text = "Enter a server IP address"
-		return
-	var err = MultiplayerManager.join_server(ip, _port)
-	if err != OK:
-		status_label.text = "Failed to connect"
-		return
-	status_label.text = "Connecting to %s..." % ip
-	_set_buttons_connected(true)
-
 func _on_tutorial_pressed() -> void:
 	# Offline practice range — no multiplayer session required.
 	var err := get_tree().change_scene_to_file("res://addons/godot-multiplayer-weapon-system/scenes/tutorial.tscn")
@@ -110,10 +76,6 @@ func _on_tutorial_pressed() -> void:
 func _on_class_arena_pressed() -> void:
 	ClassArena.next_allow_respec = _respec_check.button_pressed if _respec_check else false
 	get_tree().change_scene_to_file("res://addons/godot-multiplayer-weapon-system/scenes/class_arena.tscn")
-
-func _on_evolution_pressed() -> void:
-	# Offline team-vs-bots round mode with the modifier draft — no networking.
-	get_tree().change_scene_to_file("res://addons/godot-multiplayer-weapon-system/scenes/evolution.tscn")
 
 func _on_settings_pressed() -> void:
 	add_child(SettingsMenu.new())
@@ -207,8 +169,6 @@ func _on_peer_disconnected(peer_id: int) -> void:
 func _update_ui(state: int) -> void:
 	# Offline practice is only offered when not in a session.
 	tutorial_button.visible = state == MultiplayerManager.ConnectionState.DISCONNECTED
-	if _evolution_button:
-		_evolution_button.visible = state == MultiplayerManager.ConnectionState.DISCONNECTED
 	if _class_arena_button:
 		_class_arena_button.visible = state == MultiplayerManager.ConnectionState.DISCONNECTED
 	if _respec_check:
@@ -217,10 +177,6 @@ func _update_ui(state: int) -> void:
 		MultiplayerManager.ConnectionState.DISCONNECTED:
 			status_label.text = "Disconnected"
 			_show_connect_controls(true)
-			ip_input.text = ""
-			ip_input.editable = true
-			join_button.disabled = false
-			host_button.disabled = false
 			# Online buttons require WebRTC (web build, or desktop with the
 			# webrtc-native extension installed).
 			var online_ok := MultiplayerManager.is_online_available()
@@ -262,18 +218,12 @@ func _update_ui(state: int) -> void:
 			start_button.visible = false
 			_refresh_player_list()
 
-## Show or hide all the "start a session" controls (LAN + online) at once.
+## Show or hide the "start a session" (online) controls at once.
 func _show_connect_controls(show_controls: bool) -> void:
-	host_button.visible = show_controls
-	join_section.visible = show_controls
-	online_separator.visible = show_controls
 	host_online_button.visible = show_controls
 	join_online_section.visible = show_controls
 
 func _set_buttons_connected(connected: bool) -> void:
-	host_button.disabled = connected
-	join_button.disabled = connected
-	ip_input.editable = not connected
 	host_online_button.disabled = connected
 	join_online_button.disabled = connected
 	room_code_input.editable = not connected
