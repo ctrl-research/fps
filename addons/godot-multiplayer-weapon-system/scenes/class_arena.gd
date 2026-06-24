@@ -30,9 +30,11 @@ enum Phase { SELECT, SPEC, PRE, LIVE, POST }
 static var next_allow_respec: bool = false
 
 var _player: PlayerController = null
-var _bots: Array = []
+var _bots: Array = []                # enemy team (team 1)
+var _ally_bots: Array = []           # player's team (team 0), start each round downed
 var _player_spawn: Vector3 = Vector3.ZERO
 var _bot_spawns: Array = []
+var _team0_spawns: Array = []
 
 var _class_id: String = ""
 var _spec: SpecTree = null
@@ -55,7 +57,8 @@ func _ready() -> void:
 	_build_environment()
 	var arena := Arena.new()
 	add_child(arena)
-	_player_spawn = arena.team_spawns(0)[0]
+	_team0_spawns = arena.team_spawns(0)
+	_player_spawn = _team0_spawns[0]
 	_bot_spawns = arena.team_spawns(1)
 	_spawn_bots()
 	_build_hud()
@@ -100,6 +103,7 @@ func _on_class_picked(class_id: String) -> void:
 	_class_id = class_id
 	_spec = SpecTree.new(class_id)
 	_spawn_player()
+	_spawn_ally_bots()
 	_enter_spec()
 
 func _enter_spec() -> void:
@@ -162,6 +166,11 @@ func _begin_live() -> void:
 	for bot in _bots:
 		if is_instance_valid(bot):
 			bot.reset_for_round()
+	# Ally bots start each round downed, waiting for the player to revive them.
+	for ally in _ally_bots:
+		if is_instance_valid(ally):
+			ally.reset_for_round()
+			ally.knock_down()
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 	_set_combat_active(true)
 	_update_day_night()
@@ -219,6 +228,7 @@ func _spawn_player() -> void:
 	_player = load(PLAYER_SCENE).instantiate()
 	_player.name = "Player_%d" % PLAYER_PEER
 	_player.authority_peer_id = PLAYER_PEER
+	_player.team = 0
 	_player.class_id = _class_id
 	# The mode owns the cursor during select/spec/countdowns.
 	_player.capture_mouse_on_ready = false
@@ -237,8 +247,28 @@ func _spawn_bots() -> void:
 		bot.class_id = bot_classes[index]
 		bot.position = _bot_spawns[index]
 		add_child(bot)
+		bot.team = 1
 		bot.defeated.connect(_on_bot_defeated)
 		_bots.append(bot)
+
+## Spawn the player's ally bots: one of each class the player didn't pick. They
+## start each round downed so the player can revive them (and they fight enemy
+## bots once revived). They don't count toward the round-win check.
+func _spawn_ally_bots() -> void:
+	var scene: PackedScene = load(BOT_SCENE)
+	var index := 0
+	for cid in ClassDatabase.class_ids():
+		if cid == _class_id:
+			continue
+		var bot: Bot = scene.instantiate()
+		bot.authority_peer_id = 2002 + index * 2   # even ids
+		bot.auto_respawn = false
+		bot.team = 0
+		bot.class_id = cid
+		bot.position = _team0_spawns[mini(index + 1, _team0_spawns.size() - 1)]
+		add_child(bot)
+		_ally_bots.append(bot)
+		index += 1
 
 func _set_combat_active(active: bool) -> void:
 	if is_instance_valid(_player):
@@ -248,6 +278,9 @@ func _set_combat_active(active: bool) -> void:
 	for bot in _bots:
 		if is_instance_valid(bot):
 			bot.set_physics_process(active)
+	for ally in _ally_bots:
+		if is_instance_valid(ally):
+			ally.set_physics_process(active)
 
 # === HUD / helpers ===
 

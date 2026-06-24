@@ -18,6 +18,8 @@ signal defeated(by_peer_id: int)
 @export var authority_peer_id: int = 1001
 ## Optional class identity (warrior / mage / archer) — picks the matching model.
 @export var class_id: String = ""
+## Team id (0 = player's team / ally, 1 = enemy). Drives targeting, revive, tint.
+@export var team: int = 1
 
 const GRAVITY: float = 20.0
 const RESPAWN_DELAY: float = 5.0
@@ -27,6 +29,12 @@ const MOVE_SPEED: float = 4.5
 const MELEE_RANGE: float = 2.6
 const MELEE_DAMAGE: float = 14.0
 const ATTACK_INTERVAL: float = 1.1
+
+# Downed / revive tuning.
+const DOWNED_DURATION: float = 12.0     # bleedout time while downed (revivable)
+const DOWNED_CRAWL_SPEED: float = 1.6   # slow retreat while downed
+const REVIVE_RANGE: float = 2.4         # ally must reach this to revive
+const REVIVE_TIME: float = 3.0          # seconds an ally channels to revive
 
 @onready var _mesh: MeshInstance3D = $Mesh
 @onready var _head: MeshInstance3D = $Head
@@ -47,6 +55,9 @@ var health: float = 0.0
 var _dead: bool = false
 var _respawn_timer: float = 0.0
 var _attack_timer: float = 0.0
+var _downed: bool = false
+var _bleedout: float = 0.0
+var _revive_channel: float = 0.0    # progress while THIS bot revives a downed ally
 # Class-derived combat behaviour (set from class_id in _configure_class).
 var _ranged: bool = false
 var _attack_range: float = MELEE_RANGE
@@ -88,7 +99,7 @@ func _ready() -> void:
 	if class_id != "":
 		model_path = String(ClassDatabase.get_def(class_id).get("model", BOT_MODEL))
 	_model.setup(model_path)
-	_model.set_tint(CategoryColors.ENEMY)
+	_model.set_tint(CategoryColors.ALLY if team == 0 else CategoryColors.ENEMY)
 
 	_configure_class()
 	_reset()
@@ -132,6 +143,11 @@ func _physics_process(delta: float) -> void:
 	var grav := 0.0 if is_on_floor() else -GRAVITY * delta
 	velocity.y += grav
 
+	# Downed: bleed out unless an ally revives in time; crawl slowly toward safety.
+	if _downed:
+		_process_downed(delta)
+		return
+
 	if _slow_time > 0.0:
 		_slow_time -= delta
 		if _slow_time <= 0.0:
@@ -144,10 +160,24 @@ func _physics_process(delta: float) -> void:
 		move_and_slide()
 		return
 
+	# A living bot prioritises reviving a downed ally; otherwise it fights.
+	var move := Vector3.ZERO
+	var ally := _find_downed_ally()
+	if ally != null:
+		move = _revive_ally(ally, delta)
+		velocity.x = move.x
+		velocity.z = move.z
+		move_and_slide()
+		if _model != null:
+			var m := global_position - _prev_anim_pos
+			_prev_anim_pos = global_position
+			_model.set_locomotion(Vector2(m.x, m.z).length() / maxf(delta, 0.0001), is_on_floor())
+		return
+	_revive_channel = 0.0
+
 	# Engage the nearest visible player. Melee bots close in; ranged bots hold at
 	# their attack range, back off if crowded, and fire projectiles.
 	var target := _find_target()
-	var move := Vector3.ZERO
 	if target != null:
 		_face(target)
 		var to := target.global_position - global_position
@@ -185,15 +215,48 @@ func request_damage(amount: float, attacker_id: int) -> void:
 	if _dead or amount <= 0.0:
 		return
 	_last_attacker_id = attacker_id
+	# A hit on a downed bot finishes it off (true death).
+	if _downed:
+		_die()
+		return
 	health = max(health - amount, 0.0)
 	_label.text = "%d" % int(health)
 	_material.albedo_color = Color(1.0, 1.0, 1.0)
 	_hit_flash_timer = HIT_FLASH_TIME
 	if health <= 0.0:
+		_enter_downed()
+
+## Knocked down (revivable) rather than killed outright. An allied bot can revive
+## it; another hit, or the bleedout timer, finishes it.
+func _enter_downed() -> void:
+	_downed = true
+	_bleedout = DOWNED_DURATION
+	_muzzle_flash.visible = false
+	if _model != null:
+		_model.play_death()
+	_label.text = "DOWNED"
+
+## Tick bleedout and crawl slowly away from threats while downed.
+func _process_downed(delta: float) -> void:
+	_bleedout -= delta
+	_label.text = "DOWNED %d" % int(ceil(maxf(_bleedout, 0.0)))
+	if _bleedout <= 0.0:
 		_die()
+		return
+	var threat := _find_target()
+	var move := Vector3.ZERO
+	if threat != null:
+		var away := global_position - threat.global_position
+		away.y = 0.0
+		if away.length() > 0.1:
+			move = away.normalized() * DOWNED_CRAWL_SPEED
+	velocity.x = move.x
+	velocity.z = move.z
+	move_and_slide()
 
 func _die() -> void:
 	_dead = true
+	_downed = false
 	_respawn_timer = RESPAWN_DELAY
 	_muzzle_flash.visible = false
 	if _model != null:
@@ -202,8 +265,63 @@ func _die() -> void:
 	_collision.set_deferred("disabled", true)
 	defeated.emit(_last_attacker_id)
 
+## Bring a downed bot back into the fight (called by an allied bot).
+func revive() -> void:
+	if not _downed or _dead:
+		return
+	_downed = false
+	_bleedout = 0.0
+	health = max_health * stat_health_mult * 0.5
+	if _model != null:
+		_model.play_idle()
+	_label.text = "%d" % int(health)
+	_update_color()
+
+func is_downed() -> bool:
+	return _downed
+
+## Put a living bot straight into the downed state (e.g. ally bots that start a
+## round downed, waiting to be revived).
+func knock_down() -> void:
+	if not _dead and not _downed:
+		_enter_downed()
+
+## Nearest downed allied bot within reach (all bots share the enemy team).
+func _find_downed_ally() -> Bot:
+	var best: Bot = null
+	var best_dist := INF
+	for node in get_tree().get_nodes_in_group("players"):
+		if node == self or not (node is Bot) or not is_instance_valid(node):
+			continue
+		var b := node as Bot
+		if not b.is_downed() or b.team != team:
+			continue
+		var d := global_position.distance_to(b.global_position)
+		if d < best_dist:
+			best_dist = d
+			best = b
+	return best
+
+## Move toward a downed ally and channel a revive when in range. Returns the
+## desired planar move for this frame.
+func _revive_ally(ally: Bot, delta: float) -> Vector3:
+	_face(ally)
+	var to := ally.global_position - global_position
+	to.y = 0.0
+	if to.length() > REVIVE_RANGE:
+		_revive_channel = 0.0
+		return to.normalized() * (MOVE_SPEED / maxf(_slow_factor, 0.01))
+	_revive_channel += delta
+	if _revive_channel >= REVIVE_TIME:
+		_revive_channel = 0.0
+		ally.revive()
+	return Vector3.ZERO
+
 func _reset() -> void:
 	_dead = false
+	_downed = false
+	_bleedout = 0.0
+	_revive_channel = 0.0
 	health = max_health * stat_health_mult
 	if _model != null:
 		_model.play_idle()
@@ -239,48 +357,59 @@ func apply_slow(factor: float, seconds: float) -> void:
 	_slow_factor = factor
 	_slow_time = maxf(_slow_time, seconds)
 
-## Nearest living player with a clear line of sight, at any range (bots ignore
-## downed/dead targets and each other).
-func _find_target() -> PlayerController:
-	var best: PlayerController = null
+## Nearest living enemy (opposing team) with a clear line of sight — a player or
+## an enemy bot. Ignores downed/dead and same-team units.
+func _find_target() -> Node3D:
+	var best: Node3D = null
 	var best_dist := INF
 	for node in get_tree().get_nodes_in_group("players"):
-		if not (node is PlayerController) or not is_instance_valid(node):
+		if node == self or not is_instance_valid(node):
 			continue
-		var player := node as PlayerController
-		if player.is_dead or player.is_downed:
+		var other_team := 99
+		var alive := false
+		if node is PlayerController:
+			var p := node as PlayerController
+			other_team = p.team
+			alive = not (p.is_dead or p.is_downed)
+		elif node is Bot:
+			var b := node as Bot
+			other_team = b.team
+			alive = b.is_alive() and not b.is_downed()
+		else:
 			continue
-		var dist := global_position.distance_to(player.global_position)
-		if dist <= best_dist and _has_line_of_sight(player):
-			best = player
+		if other_team == team or not alive:
+			continue
+		var t := node as Node3D
+		var dist := global_position.distance_to(t.global_position)
+		if dist <= best_dist and _has_line_of_sight(t):
+			best = t
 			best_dist = dist
 	return best
 
-## True if nothing solid sits between the bot's eye and the player (so bots
-## behind walls don't fire until you reach the doorway).
-func _has_line_of_sight(player: PlayerController) -> bool:
+## True if nothing solid sits between the bot's eye and the target.
+func _has_line_of_sight(target: Node3D) -> bool:
 	var space := get_world_3d().direct_space_state
 	var query := PhysicsRayQueryParameters3D.create(
-		_eye.global_position, player.global_position + Vector3(0.0, 1.0, 0.0))
+		_eye.global_position, target.global_position + Vector3(0.0, 1.0, 0.0))
 	query.collide_with_bodies = true
 	query.exclude = [get_rid()]
 	var hit := space.intersect_ray(query)
-	return hit.is_empty() or hit.get("collider") == player
+	return hit.is_empty() or hit.get("collider") == target
 
-func _face(target: PlayerController) -> void:
+func _face(target: Node3D) -> void:
 	var flat := target.global_position
 	flat.y = global_position.y
 	if global_position.distance_to(flat) > 0.05:
 		look_at(flat, Vector3.UP)
 
 ## Melee strike: damage the target if it's still within reach when the swing lands.
-func _melee_attack(target: PlayerController) -> void:
+func _melee_attack(target: Node3D) -> void:
 	GameAudio.play_at(global_position, "swing", "movement")
 	if is_instance_valid(target) and global_position.distance_to(target.global_position) <= MELEE_RANGE + 0.6:
 		target.request_damage(MELEE_DAMAGE * stat_damage_mult, authority_peer_id)
 
 ## Ranged strike (mage/archer): fire a projectile at the target.
-func _ranged_attack(target: PlayerController) -> void:
+func _ranged_attack(target: Node3D) -> void:
 	if not is_instance_valid(target):
 		return
 	GameAudio.play_at(global_position, "swing", "movement")

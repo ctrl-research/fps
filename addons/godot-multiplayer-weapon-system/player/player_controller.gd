@@ -22,6 +22,8 @@ signal revived()
 
 ## Multiplayer authority ID for this body (0 = server/authority)
 @export var authority_peer_id: int = 1
+## Team id (0 = the local player's team, 1 = enemy). Used for revive/targeting.
+@export var team: int = 0
 
 ## Maximum health
 @export var max_health: float = 100.0
@@ -34,7 +36,15 @@ signal revived()
 const WALK_SPEED: float = 6.0
 const SPRINT_SPEED: float = 9.0
 const CROUCH_SPEED: float = 3.0
+const CRAWL_SPEED: float = 1.8          # slow drag while downed (reach cover)
 const JUMP_VELOCITY: float = 5.0
+
+# === Revive ===
+const REVIVE_RANGE: float = 2.6         # stand within this of a downed ally
+const REVIVE_TIME: float = 3.0          # seconds of holding F to revive
+const REVIVE_HEALTH_FRACTION: float = 0.45
+var revive_target: Node = null          # downed ally being revived (HUD reads this)
+var revive_progress: float = 0.0        # 0..1
 const GRAVITY: float = 20.0
 
 # === Camera ===
@@ -383,6 +393,7 @@ func _physics_process(delta: float) -> void:
 		return
 
 	_handle_movement(delta)
+	_update_revive(delta)
 	_update_animation(delta)
 
 ## Drive the character model: death pose while down/dead, otherwise pick
@@ -410,21 +421,95 @@ func _update_footsteps(delta: float, planar: float, on_floor: bool) -> void:
 		_footstep_timer = FOOTSTEP_INTERVAL
 		GameAudio.play_at(global_position, "footstep", "footstep")
 
-## Downed players can't move or act; they just bleed out (gravity keeps them
-## grounded). The HUD shows the countdown.
+## Downed players bleed out, but can crawl slowly to reach cover while waiting
+## for a revive. The HUD shows the countdown.
 func _process_downed(delta: float) -> void:
 	bleedout_timer -= delta
 	if bleedout_timer <= 0.0:
 		_bleed_out()
 		return
-	velocity.x = 0.0
-	velocity.z = 0.0
+	var input_dir := Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
+	var dir := (transform.basis * Vector3(input_dir.x, 0.0, input_dir.y))
+	dir.y = 0.0
+	dir = dir.normalized()
+	velocity.x = dir.x * CRAWL_SPEED
+	velocity.z = dir.z * CRAWL_SPEED
 	if not is_on_floor():
 		_velocity_y -= GRAVITY * delta
 	else:
 		_velocity_y = 0.0
 	velocity.y = _velocity_y
 	move_and_slide()
+
+# === Revive ===
+
+## While alive, a player standing on a downed ally and holding F revives them.
+func _update_revive(delta: float) -> void:
+	revive_target = _find_downed_ally()
+	if revive_target != null and Input.is_key_pressed(KEY_F):
+		revive_progress = minf(1.0, revive_progress + delta / REVIVE_TIME)
+		if revive_progress >= 1.0:
+			revive_progress = 0.0
+			_do_revive(revive_target)
+			revive_target = null
+	else:
+		revive_progress = 0.0
+
+## Nearest downed same-team ally (player or bot) within REVIVE_RANGE.
+func _find_downed_ally() -> Node:
+	var best: Node = null
+	var best_dist := REVIVE_RANGE
+	for node in get_tree().get_nodes_in_group("players"):
+		if node == self or not is_instance_valid(node):
+			continue
+		var downed := false
+		var other_team := -99
+		if node is PlayerController:
+			downed = (node as PlayerController).is_downed
+			other_team = (node as PlayerController).team
+		elif node.has_method("is_downed"):
+			downed = node.is_downed()
+			other_team = node.team
+		if not downed or other_team != team:
+			continue
+		var d := global_position.distance_to((node as Node3D).global_position)
+		if d <= best_dist:
+			best_dist = d
+			best = node
+	return best
+
+func _do_revive(target: Node) -> void:
+	if target is PlayerController:
+		(target as PlayerController).request_revive()
+	elif target.has_method("revive"):
+		target.revive()
+	GameAudio.play_at(global_position, "round_win", "ui")
+
+## Revive request routed to the downed player's authority (for multiplayer).
+func request_revive() -> void:
+	if multiplayer.multiplayer_peer == null or authority_peer_id == _local_peer():
+		revive_in_place()
+	else:
+		_receive_revive.rpc_id(authority_peer_id)
+
+@rpc("any_peer", "call_remote", "reliable")
+func _receive_revive() -> void:
+	revive_in_place()
+
+## Restore a downed player at their current position (no teleport).
+func revive_in_place() -> void:
+	if not is_downed:
+		return
+	is_downed = false
+	bleedout_timer = 0.0
+	health = max_health * REVIVE_HEALTH_FRACTION
+	if is_multiplayer_authority():
+		GameAudio.stop_heartbeat()
+	if _model != null:
+		_model.play_idle()
+	health_changed.emit(health, max_health)
+	revived.emit()
+	_broadcast_health()
 
 func _handle_movement(delta: float) -> void:
 	# Slide cooldown
