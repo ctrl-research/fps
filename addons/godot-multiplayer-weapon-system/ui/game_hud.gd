@@ -35,6 +35,7 @@ var _scores_label: Label = null
 var _buy_hint: Label = null
 var _minimap: Control = null
 var _status_label: Label = null
+var _showing_revive: bool = false
 var _crosshair: Control = null
 var _ability_bar: Control = null
 
@@ -71,8 +72,18 @@ func _process(_delta: float) -> void:
 		_minimap.queue_redraw()
 	if _ability_bar:
 		_ability_bar.queue_redraw()
-	if _player and _player.is_downed:
-		_status_label.text = "DOWNED — %ds" % int(ceil(maxf(_player.bleedout_timer, 0.0)))
+	if _player and is_instance_valid(_player):
+		if _player.is_downed:
+			_status_label.text = "DOWNED — %ds" % int(ceil(maxf(_player.bleedout_timer, 0.0)))
+		elif not _player.is_dead and _player.revive_target != null:
+			if _player.revive_progress > 0.0:
+				_status_label.text = "Reviving… %d%%" % int(_player.revive_progress * 100.0)
+			else:
+				_status_label.text = "Hold [F] to revive a teammate"
+			_showing_revive = true
+		elif _showing_revive and not _player.is_dead:
+			_status_label.text = ""
+			_showing_revive = false
 	_update_scoreboard()
 
 ## Show the scoreboard while Tab is held (rebuilt on press for live values).
@@ -277,13 +288,28 @@ func _draw_minimap() -> void:
 		var dot := center + planar * MINIMAP_PIXELS_PER_METRE
 		if dot.x < 4.0 or dot.x > _minimap.size.x - 4.0 or dot.y < 4.0 or dot.y > _minimap.size.y - 4.0:
 			continue
+		var color := LOCAL_COLOR if node == _player else _team_color(node)
+		# Downed players/bots are marked with an X.
+		var downed := false
+		if node is PlayerController:
+			downed = (node as PlayerController).is_downed
+		elif node.has_method("is_downed"):
+			downed = node.is_downed()
+		if downed:
+			_draw_minimap_x(dot, color)
+			continue
 		var facing3 := -body.global_transform.basis.z
 		var facing := Vector2(facing3.x, facing3.z)
 		if facing.length() < 0.01:
 			facing = Vector2(0.0, -1.0)
 		facing = facing.rotated(rot).normalized()
-		var color := LOCAL_COLOR if node == _player else _team_color(node)
 		_draw_pointer(dot, facing, color)
+
+## An X marker at `pos` (downed player/bot).
+func _draw_minimap_x(pos: Vector2, color: Color) -> void:
+	var s := 5.0
+	_minimap.draw_line(pos + Vector2(-s, -s), pos + Vector2(s, s), color, 2.0)
+	_minimap.draw_line(pos + Vector2(-s, s), pos + Vector2(s, -s), color, 2.0)
 
 ## A small arrowhead at `pos` pointing along `facing` (a directional dot).
 func _draw_pointer(pos: Vector2, facing: Vector2, color: Color) -> void:
