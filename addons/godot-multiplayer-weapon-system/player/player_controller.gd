@@ -148,7 +148,9 @@ func _ready() -> void:
 	if is_local:
 		_pov_light = OmniLight3D.new()
 		_pov_light.name = "POVLight"
-		_pov_light.omni_attenuation = 1.2
+		# Flatter falloff so the light actually carries out to its range (a steep
+		# attenuation made the radius slider look like it did nothing).
+		_pov_light.omni_attenuation = 0.5
 		_pov_light.shadow_enabled = false
 		# Don't let the point-blank POV light blow out the viewmodel — it gets its
 		# own dim light below so its shadows still land in the dither band.

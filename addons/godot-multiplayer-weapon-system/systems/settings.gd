@@ -30,8 +30,8 @@ const DEFAULT_DITHER_CONTRAST: float = 1.4   # how sharply lit/shade split
 const MAX_DITHER_CONTRAST: float = 4.0
 
 ## Player POV light: added contrast/shadow on top of ambient, not the only source.
-const DEFAULT_POV_RANGE: float = 80.0
-const MAX_POV_RANGE: float = 200.0
+const DEFAULT_POV_RANGE: float = 160.0
+const MAX_POV_RANGE: float = 300.0
 const DEFAULT_POV_ENERGY: float = 2.0
 const MAX_POV_ENERGY: float = 8.0
 
