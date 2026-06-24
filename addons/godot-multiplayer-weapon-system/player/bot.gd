@@ -305,7 +305,7 @@ func _find_downed_ally() -> Node3D:
 		if not downed or not ally:
 			continue
 		var d := global_position.distance_to((node as Node3D).global_position)
-		if d < best_dist:
+		if d < best_dist and _has_line_of_sight(node as Node3D):
 			best_dist = d
 			best = node
 	return best

@@ -428,6 +428,7 @@ func _process_downed(delta: float) -> void:
 	if bleedout_timer <= 0.0:
 		_bleed_out()
 		return
+	_apply_look()   # downed players can still look around (and crawl)
 	var input_dir := Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
 	var dir := (transform.basis * Vector3(input_dir.x, 0.0, input_dir.y))
 	dir.y = 0.0
@@ -473,10 +474,21 @@ func _find_downed_ally() -> Node:
 		if not downed or other_team != team:
 			continue
 		var d := global_position.distance_to((node as Node3D).global_position)
-		if d <= best_dist:
+		if d <= best_dist and _clear_los_to(node as Node3D):
 			best_dist = d
 			best = node
 	return best
+
+## True if nothing solid blocks the line from this body to `target` (no reviving
+## through walls).
+func _clear_los_to(target: Node3D) -> bool:
+	var space := get_world_3d().direct_space_state
+	var query := PhysicsRayQueryParameters3D.create(
+		global_position + Vector3(0.0, 1.0, 0.0), target.global_position + Vector3(0.0, 1.0, 0.0))
+	query.collision_mask = 1
+	query.exclude = [get_rid()]
+	var hit := space.intersect_ray(query)
+	return hit.is_empty() or hit.get("collider") == target
 
 func _do_revive(target: Node) -> void:
 	if target is PlayerController:
@@ -578,9 +590,11 @@ func _handle_movement(delta: float) -> void:
 	# Apply movement
 	move_and_slide()
 
-	# Camera rotation follows body yaw. Wrap (don't clamp) so horizontal turning
-	# is unlimited — wrapping from PI to -PI is the same orientation, so it's
-	# seamless, whereas clamping would hard-stop the view at +/-180 degrees.
+	_apply_look()
+
+## Apply yaw to the body and pitch to the camera. Wrap (don't clamp) yaw so
+## horizontal turning is unlimited (PI and -PI are the same orientation).
+func _apply_look() -> void:
 	_yaw = wrapf(_yaw, -PI, PI)
 	rotation = Vector3(0, _yaw, 0)
 	_camera.rotation = Vector3(_pitch, 0, 0)

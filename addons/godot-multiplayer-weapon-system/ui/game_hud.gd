@@ -289,13 +289,19 @@ func _draw_minimap() -> void:
 		if dot.x < 4.0 or dot.x > _minimap.size.x - 4.0 or dot.y < 4.0 or dot.y > _minimap.size.y - 4.0:
 			continue
 		var color := LOCAL_COLOR if node == _player else _team_color(node)
-		# Downed players/bots are marked with an X.
+		# Downed (revivable) = +, dead (gone) = X.
 		var downed := false
+		var dead := false
 		if node is PlayerController:
 			downed = (node as PlayerController).is_downed
-		elif node.has_method("is_downed"):
-			downed = node.is_downed()
+			dead = (node as PlayerController).is_dead
+		elif node is Bot:
+			downed = (node as Bot).is_downed()
+			dead = not (node as Bot).is_alive()
 		if downed:
+			_draw_minimap_plus(dot, color)
+			continue
+		if dead:
 			_draw_minimap_x(dot, color)
 			continue
 		var facing3 := -body.global_transform.basis.z
@@ -305,7 +311,13 @@ func _draw_minimap() -> void:
 		facing = facing.rotated(rot).normalized()
 		_draw_pointer(dot, facing, color)
 
-## An X marker at `pos` (downed player/bot).
+## A + marker at `pos` (downed but revivable).
+func _draw_minimap_plus(pos: Vector2, color: Color) -> void:
+	var s := 5.0
+	_minimap.draw_line(pos + Vector2(-s, 0.0), pos + Vector2(s, 0.0), color, 2.0)
+	_minimap.draw_line(pos + Vector2(0.0, -s), pos + Vector2(0.0, s), color, 2.0)
+
+## An X marker at `pos` (dead / gone).
 func _draw_minimap_x(pos: Vector2, color: Color) -> void:
 	var s := 5.0
 	_minimap.draw_line(pos + Vector2(-s, -s), pos + Vector2(s, s), color, 2.0)
