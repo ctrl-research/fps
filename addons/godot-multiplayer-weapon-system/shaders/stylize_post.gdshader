@@ -103,7 +103,9 @@ void fragment() {
 	vec3 lit_tone = clamp(chroma * lit_strength, 0.0, 1.0);
 	vec3 shade_tone = clamp(chroma * shade_strength, 0.0, 1.0);
 	float t = smoothstep(shadow_low, shadow_high, clamp((l - 0.5) * light_contrast + 0.5, 0.0, 1.0));
-	float lit = step(hash(floor(SCREEN_UV / SCREEN_PIXEL_SIZE / grain_size)), t);
+	// Suppress lit dots in (near-)solid shadow so stray low-hash cells don't show
+	// as persistent white specks; the grain still lives in the lit/shade band.
+	float lit = step(hash(floor(SCREEN_UV / SCREEN_PIXEL_SIZE / grain_size)), t) * step(0.02, t);
 	vec3 world_col = mix(shade_tone, lit_tone, lit);
 
 	COLOR = vec4(mix(world_col, sky_col, float(is_sky)), 1.0);
