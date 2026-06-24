@@ -76,6 +76,8 @@ func _process(delta: float) -> void:
 	if _phase != Phase.LIVE and Input.get_mouse_mode() != Input.MOUSE_MODE_VISIBLE:
 		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	match _phase:
+		Phase.LIVE:
+			_check_round_end()
 		Phase.POST:
 			_timer -= delta
 			_countdown_label.text = "Round %d to %s\nNext round in %d" % [
@@ -183,17 +185,31 @@ func _apply_spec() -> void:
 # === Round resolution ===
 
 func _on_bot_defeated(_by_peer_id: int) -> void:
-	if _phase != Phase.LIVE:
-		return
-	for bot in _bots:
-		if is_instance_valid(bot) and bot.is_alive():
-			return
-	_end_round(0)
+	_check_round_end()
 
 func _on_player_downed() -> void:
+	_check_round_end()
+
+## A team loses the moment ALL its members are down or dead (nobody left to
+## revive), rather than waiting for bleedout timers. Team 0 = player + ally bots,
+## team 1 = enemy bots.
+func _check_round_end() -> void:
 	if _phase != Phase.LIVE:
 		return
-	_end_round(1)
+	var enemies_up := 0
+	for bot in _bots:
+		if is_instance_valid(bot) and bot.is_alive() and not bot.is_downed():
+			enemies_up += 1
+	var allies_up := 0
+	if is_instance_valid(_player) and not _player.is_dead and not _player.is_downed:
+		allies_up += 1
+	for ally in _ally_bots:
+		if is_instance_valid(ally) and ally.is_alive() and not ally.is_downed():
+			allies_up += 1
+	if enemies_up == 0:
+		_end_round(0)
+	elif allies_up == 0:
+		_end_round(1)
 
 func _end_round(winner: int) -> void:
 	_set_combat_active(false)

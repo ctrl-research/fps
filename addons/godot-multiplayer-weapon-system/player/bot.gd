@@ -31,7 +31,7 @@ const MELEE_DAMAGE: float = 14.0
 const ATTACK_INTERVAL: float = 1.1
 
 # Downed / revive tuning.
-const DOWNED_DURATION: float = 12.0     # bleedout time while downed (revivable)
+const DOWNED_DURATION: float = 30.0     # bleedout time while downed (revivable)
 const DOWNED_CRAWL_SPEED: float = 1.6   # slow retreat while downed
 const REVIVE_RANGE: float = 2.4         # ally must reach this to revive
 const REVIVE_TIME: float = 3.0          # seconds an ally channels to revive
@@ -287,24 +287,32 @@ func knock_down() -> void:
 		_enter_downed()
 
 ## Nearest downed allied bot within reach (all bots share the enemy team).
-func _find_downed_ally() -> Bot:
-	var best: Bot = null
+## Nearest downed same-team ally (bot OR player) within reach.
+func _find_downed_ally() -> Node3D:
+	var best: Node3D = null
 	var best_dist := INF
 	for node in get_tree().get_nodes_in_group("players"):
-		if node == self or not (node is Bot) or not is_instance_valid(node):
+		if node == self or not is_instance_valid(node):
 			continue
-		var b := node as Bot
-		if not b.is_downed() or b.team != team:
+		var downed := false
+		var ally := false
+		if node is PlayerController:
+			downed = (node as PlayerController).is_downed
+			ally = (node as PlayerController).team == team
+		elif node is Bot:
+			downed = (node as Bot).is_downed()
+			ally = (node as Bot).team == team
+		if not downed or not ally:
 			continue
-		var d := global_position.distance_to(b.global_position)
+		var d := global_position.distance_to((node as Node3D).global_position)
 		if d < best_dist:
 			best_dist = d
-			best = b
+			best = node
 	return best
 
-## Move toward a downed ally and channel a revive when in range. Returns the
-## desired planar move for this frame.
-func _revive_ally(ally: Bot, delta: float) -> Vector3:
+## Move toward a downed ally (bot or player) and channel a revive when in range.
+## Returns the desired planar move for this frame.
+func _revive_ally(ally: Node3D, delta: float) -> Vector3:
 	_face(ally)
 	var to := ally.global_position - global_position
 	to.y = 0.0
@@ -314,7 +322,10 @@ func _revive_ally(ally: Bot, delta: float) -> Vector3:
 	_revive_channel += delta
 	if _revive_channel >= REVIVE_TIME:
 		_revive_channel = 0.0
-		ally.revive()
+		if ally is PlayerController:
+			(ally as PlayerController).request_revive()
+		elif ally.has_method("revive"):
+			ally.revive()
 	return Vector3.ZERO
 
 func _reset() -> void:

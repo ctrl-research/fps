@@ -99,7 +99,7 @@ var _pitch: float = 0.0
 
 # === Combat ===
 ## Seconds in the downed state before bleeding out.
-const DOWNED_DURATION: float = 10.0
+const DOWNED_DURATION: float = 30.0
 ## How quickly grenade knockback decays (m/s per second).
 const KNOCKBACK_DECAY: float = 18.0
 
