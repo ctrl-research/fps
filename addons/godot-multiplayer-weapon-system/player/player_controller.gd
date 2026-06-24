@@ -22,6 +22,8 @@ signal revived()
 
 ## Multiplayer authority ID for this body (0 = server/authority)
 @export var authority_peer_id: int = 1
+## Team id (0 = the local player's team, 1 = enemy). Used for revive/targeting.
+@export var team: int = 0
 
 ## Maximum health
 @export var max_health: float = 100.0
@@ -455,7 +457,6 @@ func _update_revive(delta: float) -> void:
 
 ## Nearest downed same-team ally (player or bot) within REVIVE_RANGE.
 func _find_downed_ally() -> Node:
-	var my_team := GameState._get_player_team(authority_peer_id)
 	var best: Node = null
 	var best_dist := REVIVE_RANGE
 	for node in get_tree().get_nodes_in_group("players"):
@@ -465,11 +466,11 @@ func _find_downed_ally() -> Node:
 		var other_team := -99
 		if node is PlayerController:
 			downed = (node as PlayerController).is_downed
-			other_team = GameState._get_player_team((node as PlayerController).authority_peer_id)
+			other_team = (node as PlayerController).team
 		elif node.has_method("is_downed"):
 			downed = node.is_downed()
-			other_team = GameState._get_player_team(node.get("authority_peer_id"))
-		if not downed or other_team != my_team:
+			other_team = node.team
+		if not downed or other_team != team:
 			continue
 		var d := global_position.distance_to((node as Node3D).global_position)
 		if d <= best_dist:

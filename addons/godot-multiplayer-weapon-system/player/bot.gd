@@ -18,6 +18,8 @@ signal defeated(by_peer_id: int)
 @export var authority_peer_id: int = 1001
 ## Optional class identity (warrior / mage / archer) — picks the matching model.
 @export var class_id: String = ""
+## Team id (0 = player's team / ally, 1 = enemy). Drives targeting, revive, tint.
+@export var team: int = 1
 
 const GRAVITY: float = 20.0
 const RESPAWN_DELAY: float = 5.0
@@ -97,7 +99,7 @@ func _ready() -> void:
 	if class_id != "":
 		model_path = String(ClassDatabase.get_def(class_id).get("model", BOT_MODEL))
 	_model.setup(model_path)
-	_model.set_tint(CategoryColors.ENEMY)
+	_model.set_tint(CategoryColors.ALLY if team == 0 else CategoryColors.ENEMY)
 
 	_configure_class()
 	_reset()
@@ -278,18 +280,21 @@ func revive() -> void:
 func is_downed() -> bool:
 	return _downed
 
+## Put a living bot straight into the downed state (e.g. ally bots that start a
+## round downed, waiting to be revived).
+func knock_down() -> void:
+	if not _dead and not _downed:
+		_enter_downed()
+
 ## Nearest downed allied bot within reach (all bots share the enemy team).
 func _find_downed_ally() -> Bot:
-	var my_team := GameState._get_player_team(authority_peer_id)
 	var best: Bot = null
 	var best_dist := INF
 	for node in get_tree().get_nodes_in_group("players"):
 		if node == self or not (node is Bot) or not is_instance_valid(node):
 			continue
 		var b := node as Bot
-		if not b.is_downed():
-			continue
-		if GameState._get_player_team(b.authority_peer_id) != my_team:
+		if not b.is_downed() or b.team != team:
 			continue
 		var d := global_position.distance_to(b.global_position)
 		if d < best_dist:
@@ -352,33 +357,44 @@ func apply_slow(factor: float, seconds: float) -> void:
 	_slow_factor = factor
 	_slow_time = maxf(_slow_time, seconds)
 
-## Nearest living player with a clear line of sight, at any range (bots ignore
-## downed/dead targets and each other).
-func _find_target() -> PlayerController:
-	var best: PlayerController = null
+## Nearest living enemy (opposing team) with a clear line of sight — a player or
+## an enemy bot. Ignores downed/dead and same-team units.
+func _find_target() -> Node3D:
+	var best: Node3D = null
 	var best_dist := INF
 	for node in get_tree().get_nodes_in_group("players"):
-		if not (node is PlayerController) or not is_instance_valid(node):
+		if node == self or not is_instance_valid(node):
 			continue
-		var player := node as PlayerController
-		if player.is_dead or player.is_downed:
+		var other_team := 99
+		var alive := false
+		if node is PlayerController:
+			var p := node as PlayerController
+			other_team = p.team
+			alive = not (p.is_dead or p.is_downed)
+		elif node is Bot:
+			var b := node as Bot
+			other_team = b.team
+			alive = b.is_alive() and not b.is_downed()
+		else:
 			continue
-		var dist := global_position.distance_to(player.global_position)
-		if dist <= best_dist and _has_line_of_sight(player):
-			best = player
+		if other_team == team or not alive:
+			continue
+		var t := node as Node3D
+		var dist := global_position.distance_to(t.global_position)
+		if dist <= best_dist and _has_line_of_sight(t):
+			best = t
 			best_dist = dist
 	return best
 
-## True if nothing solid sits between the bot's eye and the player (so bots
-## behind walls don't fire until you reach the doorway).
-func _has_line_of_sight(player: PlayerController) -> bool:
+## True if nothing solid sits between the bot's eye and the target.
+func _has_line_of_sight(target: Node3D) -> bool:
 	var space := get_world_3d().direct_space_state
 	var query := PhysicsRayQueryParameters3D.create(
-		_eye.global_position, player.global_position + Vector3(0.0, 1.0, 0.0))
+		_eye.global_position, target.global_position + Vector3(0.0, 1.0, 0.0))
 	query.collide_with_bodies = true
 	query.exclude = [get_rid()]
 	var hit := space.intersect_ray(query)
-	return hit.is_empty() or hit.get("collider") == player
+	return hit.is_empty() or hit.get("collider") == target
 
 func _face(target: Node3D) -> void:
 	var flat := target.global_position
@@ -387,13 +403,13 @@ func _face(target: Node3D) -> void:
 		look_at(flat, Vector3.UP)
 
 ## Melee strike: damage the target if it's still within reach when the swing lands.
-func _melee_attack(target: PlayerController) -> void:
+func _melee_attack(target: Node3D) -> void:
 	GameAudio.play_at(global_position, "swing", "movement")
 	if is_instance_valid(target) and global_position.distance_to(target.global_position) <= MELEE_RANGE + 0.6:
 		target.request_damage(MELEE_DAMAGE * stat_damage_mult, authority_peer_id)
 
 ## Ranged strike (mage/archer): fire a projectile at the target.
-func _ranged_attack(target: PlayerController) -> void:
+func _ranged_attack(target: Node3D) -> void:
 	if not is_instance_valid(target):
 		return
 	GameAudio.play_at(global_position, "swing", "movement")
