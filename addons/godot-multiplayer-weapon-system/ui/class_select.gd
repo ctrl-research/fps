@@ -46,10 +46,17 @@ func show_classes() -> void:
 		var path_names: Array = []
 		for p in paths:
 			path_names.append(p.get("name", "Path"))
+		var passive: Dictionary = def.get("passive", {})
+		var passive_line := ""
+		if not passive.is_empty():
+			passive_line = "\nPassive — %s: %s" % [
+				passive.get("name", ""), passive.get("desc", "")]
 		var button := Button.new()
-		button.custom_minimum_size = Vector2(0, 72)
-		button.text = "%s\n%s\nPaths: %s" % [
-			def.get("name", id), def.get("description", ""), " / ".join(path_names)]
+		button.custom_minimum_size = Vector2(0, 88)
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		button.text = "%s\n%s\nPaths: %s%s" % [
+			def.get("name", id), def.get("description", ""), " / ".join(path_names),
+			passive_line]
 		button.pressed.connect(func() -> void:
 			class_picked.emit(id)
 			queue_free())
