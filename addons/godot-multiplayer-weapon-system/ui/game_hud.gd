@@ -120,6 +120,7 @@ func _build_ui() -> void:
 	bottom_left.add_child(health_row)
 	var hp_tag := Label.new()
 	hp_tag.text = "HP"
+	_add_label_shadow(hp_tag)
 	health_row.add_child(hp_tag)
 	_health_bar = ProgressBar.new()
 	_health_bar.custom_minimum_size = Vector2(220, 22)
@@ -130,6 +131,10 @@ func _build_ui() -> void:
 	var hp_bg := StyleBoxFlat.new()
 	hp_bg.bg_color = Color(0.09, 0.10, 0.13)
 	hp_bg.set_corner_radius_all(3)
+	# Drop shadow so the bar separates from bright backgrounds.
+	hp_bg.shadow_size = 4
+	hp_bg.shadow_color = Color(0.0, 0.0, 0.0, 0.55)
+	hp_bg.shadow_offset = Vector2(1.5, 1.5)
 	_health_bar.add_theme_stylebox_override("background", hp_bg)
 	_health_fill = StyleBoxFlat.new()
 	_health_fill.bg_color = Color(0.3, 0.85, 0.4)
@@ -138,6 +143,7 @@ func _build_ui() -> void:
 	health_row.add_child(_health_bar)
 	_health_label = Label.new()
 	_health_label.custom_minimum_size = Vector2(48, 0)
+	_add_label_shadow(_health_label)
 	health_row.add_child(_health_label)
 
 	# Top-center: team scores + buy hint.
@@ -198,6 +204,13 @@ func _set_rect(c: Control, al: float, at: float, ar: float, ab: float,
 	c.offset_right = orr
 	c.offset_bottom = ob
 
+## Give a label a soft drop shadow so it reads over any background.
+func _add_label_shadow(label: Label) -> void:
+	label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.7))
+	label.add_theme_constant_override("shadow_offset_x", 1)
+	label.add_theme_constant_override("shadow_offset_y", 1)
+	label.add_theme_constant_override("shadow_outline_size", 1)
+
 # === Ability cooldown bar ===
 
 ## Draw a box per cooldown ability with its icon, keybind, and cooldown sweep.
@@ -228,27 +241,43 @@ func _draw_ability_bar() -> void:
 		_ability_bar.draw_string(font, Vector2(x + 4, y + 14), str(s["key"]),
 			HORIZONTAL_ALIGNMENT_LEFT, box - 8, 11, Color(0.75, 0.8, 0.95))
 		var cd := float(s["cooldown"])
-		if rem > 0.0 and cd > 0.0:
+		var active := float(s["active"])
+		var dur := float(s["duration"])
+		var border := Color(0.5, 0.6, 0.7, 0.6) if rem > 0.0 else Color(0.6, 0.85, 1.0, 0.8)
+		if active > 0.0 and dur > 0.0:
+			# Ability is ACTIVE: cyan fill that drains from the top as the duration
+			# runs down (cooldown only starts once it's empty).
+			var afrac := clampf(active / dur, 0.0, 1.0)
+			_ability_bar.draw_rect(Rect2(x, y, box, box * afrac), Color(0.2, 0.85, 1.0, 0.35))
+			_ability_bar.draw_string(font, Vector2(x, y + box * 0.62), "%d" % int(ceil(active)),
+				HORIZONTAL_ALIGNMENT_CENTER, box, 20, Color(0.6, 1.0, 1.0))
+			border = Color(0.3, 0.95, 1.0, 0.95)
+		elif rem > 0.0 and cd > 0.0:
 			# Dark sweep that shrinks from the top as the cooldown elapses.
 			var frac := clampf(rem / cd, 0.0, 1.0)
 			_ability_bar.draw_rect(Rect2(x, y, box, box * frac), Color(0, 0, 0, 0.6))
 			_ability_bar.draw_string(font, Vector2(x, y + box * 0.62), "%d" % int(ceil(rem)),
 				HORIZONTAL_ALIGNMENT_CENTER, box, 20, Color(1.0, 0.9, 0.6))
-		var border := Color(0.5, 0.6, 0.7, 0.6) if rem > 0.0 else Color(0.6, 0.85, 1.0, 0.8)
 		_ability_bar.draw_rect(rect, border, false, 2.0)
 
 # === Crosshair ===
 
 ## Draw the aiming reticle (shape from Settings.crosshair_style), centred.
+## A dark, slightly fatter copy is drawn first as a drop shadow so the reticle
+## stays legible over bright/busy backgrounds.
 func _draw_crosshair() -> void:
-	var c := _crosshair.size * 0.5
-	var col := Color(0.95, 0.95, 0.95, 0.9)
-	var t := 2.0
+	_draw_reticle(Color(0.0, 0.0, 0.0, 0.55), Vector2(1.5, 1.5), 4.0, 1.5)
+	_draw_reticle(Color(0.95, 0.95, 0.95, 0.95), Vector2.ZERO, 2.0, 0.0)
+
+## Draw the reticle shape tinted `col`, shifted by `ofs`, with line thickness `t`
+## and a radius bump `rbump` (used to fatten the shadow pass).
+func _draw_reticle(col: Color, ofs: Vector2, t: float, rbump: float) -> void:
+	var c := _crosshair.size * 0.5 + ofs
 	var gap := 4.0
 	var length := 8.0
 	match Settings.crosshair_style:
 		1:  # Dot
-			_crosshair.draw_circle(c, 2.5, col)
+			_crosshair.draw_circle(c, 2.5 + rbump, col)
 		2:  # Circle
 			_crosshair.draw_arc(c, 7.0, 0.0, TAU, 32, col, t)
 		3:  # X

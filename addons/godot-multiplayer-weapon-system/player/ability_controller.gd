@@ -39,8 +39,8 @@ const ABILITY_DEFS: Dictionary = {
 	"frost_nova": {"slot": "ability1", "cooldown": 7.0},
 	"power_shot": {"slot": "ability1", "cooldown": 6.0},
 	"multishot": {"slot": "ability1", "cooldown": 7.0},
-	"immovable": {"slot": "ult", "cooldown": 40.0},
-	"berserk": {"slot": "ult", "cooldown": 45.0},
+	"immovable": {"slot": "ult", "cooldown": 40.0, "duration": 5.0},
+	"berserk": {"slot": "ult", "cooldown": 45.0, "duration": 6.0},
 	"meteor": {"slot": "ult", "cooldown": 35.0},
 	"blizzard": {"slot": "ult", "cooldown": 38.0},
 	"snipe": {"slot": "ult", "cooldown": 30.0},
@@ -60,7 +60,8 @@ var _is_local: bool = false
 
 var _abilities: Array = ["melee", "dash"]
 var _tags: Dictionary = {}
-var _cooldowns: Dictionary = {}  # ability id -> remaining seconds
+var _cooldowns: Dictionary = {}  # ability id -> remaining cooldown seconds
+var _durations: Dictionary = {}  # ability id -> remaining ACTIVE seconds (cooldown starts when this hits 0)
 var _attack_cd: float = 0.0
 
 # Berserk capstone window (seconds remaining) + AoE tick accumulator.
@@ -104,6 +105,16 @@ func _process(delta: float) -> void:
 	for id in _cooldowns:
 		if _cooldowns[id] > 0.0:
 			_cooldowns[id] = maxf(0.0, _cooldowns[id] - delta)
+	# Tick active durations; when one expires, its cooldown begins.
+	for id in _durations.keys():
+		if _durations[id] > 0.0:
+			_durations[id] = maxf(0.0, _durations[id] - delta)
+			if _durations[id] == 0.0:
+				var def: Dictionary = ABILITY_DEFS.get(id, {})
+				var cd: float = float(def.get("cooldown", 0.0))
+				if cd > 0.0:
+					_cooldowns[id] = cd
+					ability_state_changed.emit(def.get("slot", ""), id, cd, cd)
 	if _berserk_time > 0.0:
 		_berserk_time -= delta
 		_berserk_tick -= delta
@@ -141,11 +152,18 @@ func _try_cast(id: String, def: Dictionary) -> void:
 			# Berserk roughly halves the attack interval.
 			_attack_cd = float(def.get("interval", 0.55)) * _fire_rate_mult() * (0.5 if _berserk_time > 0.0 else 1.0)
 		return
-	if _cooldowns.get(id, 0.0) > 0.0:
+	# Blocked while on cooldown OR while its active duration is still running.
+	if _cooldowns.get(id, 0.0) > 0.0 or _durations.get(id, 0.0) > 0.0:
 		return
 	var cd: float = float(def.get("cooldown", 0.0))
-	_cooldowns[id] = cd
-	ability_state_changed.emit(def.get("slot", ""), id, cd, cd)
+	var dur: float = float(def.get("duration", 0.0))
+	if dur > 0.0:
+		# Duration abilities (e.g. Berserk, Immovable): run the active window first;
+		# the cooldown only begins once it expires (see _process).
+		_durations[id] = dur
+	else:
+		_cooldowns[id] = cd
+		ability_state_changed.emit(def.get("slot", ""), id, cd, cd)
 	_cast(id)
 
 ## Short icons for base-kit abilities (granted ones get their node's icon).
@@ -168,6 +186,8 @@ func cooldown_slots() -> Array:
 			"key": Settings.binding_label(SLOT_ACTION.get(slot, "")),
 			"cooldown": float(def.get("cooldown", 0.0)),
 			"remaining": float(_cooldowns.get(id, 0.0)),
+			"duration": float(def.get("duration", 0.0)),
+			"active": float(_durations.get(id, 0.0)),
 		})
 	return out
 
@@ -500,9 +520,25 @@ func _build_swing_arc() -> void:
 	_arc_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_arc_mat.no_depth_test = true
 	_arc_mat.albedo_color = Color(0.95, 0.97, 1.0)
+	_arc_mat.render_priority = 1   # drawn after (on top of) its dark shadow copy
 	_arc.material_override = _arc_mat
 	_arc.visible = false
 	_camera.add_child(_arc)
+	# A slightly larger dark copy behind the arc — a drop shadow that rims the
+	# crescent so it stays readable over bright sky / pale walls. Child of _arc, so
+	# it inherits the swing tween's rotation, scale, and visibility for free.
+	var shadow := MeshInstance3D.new()
+	shadow.mesh = _arc.mesh
+	shadow.layers = PlayerController.VIEWMODEL_VISUAL_LAYER
+	shadow.scale = Vector3.ONE * 1.2
+	var smat := StandardMaterial3D.new()
+	smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	smat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	smat.no_depth_test = true
+	smat.albedo_color = Color(0.04, 0.05, 0.08)
+	smat.render_priority = 0   # drawn before the bright arc, so only its rim shows
+	shadow.material_override = smat
+	_arc.add_child(shadow)
 
 ## A crescent-moon shape in the XY plane (centred on +Y): a ribbon along an arc,
 ## tapered to points at both ends and fattest in the middle. Built once, reused.
