@@ -17,7 +17,7 @@ const PLAYER_SCENE: String = "res://addons/godot-multiplayer-weapon-system/playe
 const BOT_SCENE: String = "res://addons/godot-multiplayer-weapon-system/player/bot.tscn"
 
 const PLAYER_PEER: int = 1
-const ROUNDS_TO_WIN: int = 6
+const ROUNDS_TO_WIN: int = 10
 const POST_SECS: float = 5.0
 const PRE_SECS: float = 5.0
 
@@ -109,6 +109,11 @@ func _on_class_picked(class_id: String) -> void:
 	_enter_spec()
 
 func _enter_spec() -> void:
+	# Round 1 grants no spec point — go straight into the opening fight.
+	if _round == 1:
+		_apply_spec()
+		_enter_pre()
+		return
 	# Normal mode with the tree capped → nothing to pick, go to the countdown.
 	if not allow_respec and (_spec.points_spent() >= ClassDatabase.MAX_POINTS or _spec.selectable().is_empty()):
 		_apply_spec()
@@ -117,7 +122,8 @@ func _enter_spec() -> void:
 	_phase = Phase.SPEC
 	_set_combat_active(false)
 	_countdown_label.visible = false
-	var earned := mini(_round, ClassDatabase.MAX_POINTS)
+	# Points earned = rounds played so far (round 1 grants none), capped at the tree depth.
+	var earned := mini(_round - 1, ClassDatabase.MAX_POINTS)
 	var spec_ui := SpecSelect.new()
 	add_child(spec_ui)
 	if allow_respec:
@@ -350,9 +356,9 @@ func _build_environment() -> void:
 	add_child(_sky)
 
 ## Advance the sky each round: time-of-day progress plus a "doom" redness that
-## ramps from clear (round 1) to fully red by round 8.
+## ramps from clear (round 1) to fully red by the late rounds of the match.
 func _update_day_night() -> void:
 	if _sky:
 		var progress := clampf(float(_round - 1) / float(2 * ROUNDS_TO_WIN - 2), 0.0, 1.0)
-		var red := clampf(float(_round - 1) / 7.0, 0.0, 1.0)
+		var red := clampf(float(_round - 1) / float(ROUNDS_TO_WIN), 0.0, 1.0)
 		_sky.apply(progress, red)
