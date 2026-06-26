@@ -120,7 +120,6 @@ func _build_ui() -> void:
 	bottom_left.add_child(health_row)
 	var hp_tag := Label.new()
 	hp_tag.text = "HP"
-	_add_label_shadow(hp_tag)
 	health_row.add_child(hp_tag)
 	_health_bar = ProgressBar.new()
 	_health_bar.custom_minimum_size = Vector2(220, 22)
@@ -143,7 +142,6 @@ func _build_ui() -> void:
 	health_row.add_child(_health_bar)
 	_health_label = Label.new()
 	_health_label.custom_minimum_size = Vector2(48, 0)
-	_add_label_shadow(_health_label)
 	health_row.add_child(_health_label)
 
 	# Top-center: team scores + buy hint.
@@ -204,13 +202,6 @@ func _set_rect(c: Control, al: float, at: float, ar: float, ab: float,
 	c.offset_right = orr
 	c.offset_bottom = ob
 
-## Give a label a soft drop shadow so it reads over any background.
-func _add_label_shadow(label: Label) -> void:
-	label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.7))
-	label.add_theme_constant_override("shadow_offset_x", 1)
-	label.add_theme_constant_override("shadow_offset_y", 1)
-	label.add_theme_constant_override("shadow_outline_size", 1)
-
 # === Ability cooldown bar ===
 
 ## Draw a box per cooldown ability with its icon, keybind, and cooldown sweep.
@@ -236,9 +227,9 @@ func _draw_ability_bar() -> void:
 		var rect := Rect2(x, y, box, box)
 		var rem := float(s["remaining"])
 		_ability_bar.draw_rect(rect, Color(0.1, 0.12, 0.16, 0.7))
-		_ability_bar.draw_string(font, Vector2(x, y + box * 0.6), str(s["icon"]),
+		UiTheme.draw_string_shadow(_ability_bar, font, Vector2(x, y + box * 0.6), str(s["icon"]),
 			HORIZONTAL_ALIGNMENT_CENTER, box, 18, Color.WHITE)
-		_ability_bar.draw_string(font, Vector2(x + 4, y + 14), str(s["key"]),
+		UiTheme.draw_string_shadow(_ability_bar, font, Vector2(x + 4, y + 14), str(s["key"]),
 			HORIZONTAL_ALIGNMENT_LEFT, box - 8, 11, Color(0.75, 0.8, 0.95))
 		var cd := float(s["cooldown"])
 		var active := float(s["active"])
@@ -249,14 +240,14 @@ func _draw_ability_bar() -> void:
 			# runs down (cooldown only starts once it's empty).
 			var afrac := clampf(active / dur, 0.0, 1.0)
 			_ability_bar.draw_rect(Rect2(x, y, box, box * afrac), Color(0.2, 0.85, 1.0, 0.35))
-			_ability_bar.draw_string(font, Vector2(x, y + box * 0.62), "%d" % int(ceil(active)),
+			UiTheme.draw_string_shadow(_ability_bar, font, Vector2(x, y + box * 0.62), "%d" % int(ceil(active)),
 				HORIZONTAL_ALIGNMENT_CENTER, box, 20, Color(0.6, 1.0, 1.0))
 			border = Color(0.3, 0.95, 1.0, 0.95)
 		elif rem > 0.0 and cd > 0.0:
 			# Dark sweep that shrinks from the top as the cooldown elapses.
 			var frac := clampf(rem / cd, 0.0, 1.0)
 			_ability_bar.draw_rect(Rect2(x, y, box, box * frac), Color(0, 0, 0, 0.6))
-			_ability_bar.draw_string(font, Vector2(x, y + box * 0.62), "%d" % int(ceil(rem)),
+			UiTheme.draw_string_shadow(_ability_bar, font, Vector2(x, y + box * 0.62), "%d" % int(ceil(rem)),
 				HORIZONTAL_ALIGNMENT_CENTER, box, 20, Color(1.0, 0.9, 0.6))
 		_ability_bar.draw_rect(rect, border, false, 2.0)
 
