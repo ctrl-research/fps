@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#dfe4ec"/>
+      <stop offset="0.5" stop-color="#aab1bf"/>
+      <stop offset="1" stop-color="#777e8c"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe08a"/>
+      <stop offset="0.5" stop-color="#e6b23a"/>
+      <stop offset="1" stop-color="#9c6f1c"/>
+    </linearGradient>
+    <linearGradient id="blade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#9aa2b0"/>
+      <stop offset="0.5" stop-color="#eef1f6"/>
+      <stop offset="1" stop-color="#9aa2b0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Crossed swords behind the shield -->
+  <g stroke-linejoin="round" stroke-linecap="round">
+    <g transform="rotate(45 256 232)">
+      <rect x="248" y="40" width="16" height="300" rx="4" fill="url(#blade)"/>
+      <rect x="226" y="330" width="60" height="14" rx="6" fill="url(#gold)"/>
+      <rect x="248" y="340" width="16" height="42" rx="5" fill="#3a2f23"/>
+      <circle cx="256" cy="388" r="11" fill="url(#gold)"/>
+      <polygon points="256,36 250,52 262,52" fill="#eef1f6"/>
+    </g>
+    <g transform="rotate(-45 256 232)">
+      <rect x="248" y="40" width="16" height="300" rx="4" fill="url(#blade)"/>
+      <rect x="226" y="330" width="60" height="14" rx="6" fill="url(#gold)"/>
+      <rect x="248" y="340" width="16" height="42" rx="5" fill="#3a2f23"/>
+      <circle cx="256" cy="388" r="11" fill="url(#gold)"/>
+      <polygon points="256,36 250,52 262,52" fill="#eef1f6"/>
+    </g>
+  </g>
+
+  <!-- Heater shield -->
+  <path d="M256 96 L408 140 C408 270 360 360 256 416 C152 360 104 270 104 140 Z"
+        fill="url(#steel)" stroke="url(#gold)" stroke-width="10" stroke-linejoin="round"/>
+  <!-- Vertical gold band -->
+  <path d="M238 110 L274 110 C272 250 268 330 256 398 C244 330 240 250 238 110 Z" fill="url(#gold)"/>
+  <!-- Red cross emblem -->
+  <g fill="#e0473f">
+    <rect x="234" y="170" width="44" height="120" rx="8"/>
+    <rect x="196" y="208" width="120" height="44" rx="8"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="256" y="478" text-anchor="middle"
+        font-family="Georgia, 'Times New Roman', serif" font-weight="700"
+        font-size="44" letter-spacing="1.5" fill="url(#steel)" stroke="#1a1d24" stroke-width="1.2">MEDIEVAL<tspan fill="url(#gold)">-UTION</tspan></text>
+</svg>
