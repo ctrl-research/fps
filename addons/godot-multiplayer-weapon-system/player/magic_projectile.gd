@@ -20,7 +20,8 @@ var slow_factor: float = 1.0  # >1 = slower (Frostbite); applied for slow_time
 var slow_time: float = 0.0
 var pierce: bool = false      # pass through enemies (stops on walls)
 ## >0 makes the shot ballistic (arc/drop) instead of dead straight (charged bow).
-var gravity: float = 0.0
+## Named fall_gravity to avoid clashing with Area3D's built-in `gravity` property.
+var fall_gravity: float = 0.0
 ## >1 multiplies damage on a hit in the target's head region (archer headshots).
 var headshot_mult: float = 1.0
 ## Height above a target's origin counted as the head (players are ~1.8 m tall).
@@ -64,9 +65,9 @@ func launch(from: Vector3, direction: Vector3) -> void:
 	_vel = _dir * speed
 
 func _physics_process(delta: float) -> void:
-	# gravity == 0 keeps the original dead-straight flight (mage bolts, bot shots).
-	if gravity != 0.0:
-		_vel.y -= gravity * delta
+	# fall_gravity == 0 keeps the original dead-straight flight (mage bolts, bot shots).
+	if fall_gravity != 0.0:
+		_vel.y -= fall_gravity * delta
 		global_position += _vel * delta
 	else:
 		global_position += _dir * speed * delta

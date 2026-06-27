@@ -552,7 +552,7 @@ func _spawn_projectile(damage: float, aoe_radius: float, color: Color, speed: fl
 	proj.color = color
 	proj.speed = speed
 	proj.pierce = pierce
-	proj.gravity = gravity
+	proj.fall_gravity = gravity
 	# Headshots are unique to archers — only their projectiles carry the bonus.
 	if _player and _player.class_id == "archer":
 		proj.headshot_mult = ARCHER_HEADSHOT_MULT
