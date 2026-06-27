@@ -51,7 +51,7 @@ const SLOT_ACTION: Dictionary = {
 	"attack": "shoot",
 	"dash": "mobility",
 	"ability1": "utility",
-	"ult": "grenade",
+	"ult": "ultimate",
 }
 
 var _player: PlayerController = null
@@ -316,7 +316,14 @@ func _do_magic_bolt() -> void:
 func _do_blink() -> void:
 	if _player == null or _camera == null:
 		return
-	var dir := -_camera.global_transform.basis.z
+	# Teleport along the movement keys (WASD) when any are held, matching how the
+	# body moves; fall back to where the camera is aimed when standing still.
+	var input := Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
+	var dir: Vector3
+	if input != Vector2.ZERO:
+		dir = _player.global_transform.basis * Vector3(input.x, 0.0, input.y)
+	else:
+		dir = -_camera.global_transform.basis.z
 	dir.y = 0.0
 	dir = dir.normalized()
 	var from := _player.global_position
