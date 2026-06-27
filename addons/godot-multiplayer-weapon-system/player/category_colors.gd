@@ -17,9 +17,9 @@ const INTERACTABLE: Color = Color(1.0, 0.82, 0.2)
 ## bricks and structure read as plain stone.
 const MAP: Color = Color(0.57, 0.57, 0.57)
 
-## Desaturate an arbitrary colour to a grey of the same brightness, lightly
-## tinted toward MAP — used to make all map geometry read as grey while keeping
-## its light/dark contrast.
+## Desaturate an arbitrary colour to a grey of the same brightness, then pull it
+## well toward MAP — so all map geometry reads as plain grey stone while keeping
+## enough of its light/dark contrast to show relief.
 static func to_map_grey(color: Color) -> Color:
 	var l: float = color.get_luminance()
-	return Color(l, l, l).lerp(MAP, 0.35)
+	return Color(l, l, l).lerp(MAP, 0.55)
