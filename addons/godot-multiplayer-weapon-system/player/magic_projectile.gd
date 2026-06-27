@@ -19,8 +19,15 @@ var lifesteal: float = 0.0    # fraction of damage healed back to the shooter
 var slow_factor: float = 1.0  # >1 = slower (Frostbite); applied for slow_time
 var slow_time: float = 0.0
 var pierce: bool = false      # pass through enemies (stops on walls)
+## >0 makes the shot ballistic (arc/drop) instead of dead straight (charged bow).
+var gravity: float = 0.0
+## >1 multiplies damage on a hit in the target's head region (archer headshots).
+var headshot_mult: float = 1.0
+## Height above a target's origin counted as the head (players are ~1.8 m tall).
+const HEAD_MIN: float = 1.45
 
 var _dir: Vector3 = Vector3.FORWARD
+var _vel: Vector3 = Vector3.ZERO
 var _age: float = 0.0
 var _spent: bool = false
 var _hit: Array = []          # bodies already hit (pierce: avoid double-hits)
@@ -54,12 +61,27 @@ func _ready() -> void:
 func launch(from: Vector3, direction: Vector3) -> void:
 	global_position = from
 	_dir = direction.normalized()
+	_vel = _dir * speed
 
 func _physics_process(delta: float) -> void:
-	global_position += _dir * speed * delta
+	# gravity == 0 keeps the original dead-straight flight (mage bolts, bot shots).
+	if gravity != 0.0:
+		_vel.y -= gravity * delta
+		global_position += _vel * delta
+	else:
+		global_position += _dir * speed * delta
 	_age += delta
 	if _age >= lifetime:
 		queue_free()
+
+## True if this hit landed in the target's head region (for archer headshots).
+func _is_headshot(body: Node) -> bool:
+	if headshot_mult <= 1.0 or not (body is Node3D):
+		return false
+	return global_position.y - (body as Node3D).global_position.y >= HEAD_MIN
+
+func _hit_damage(body: Node) -> float:
+	return damage * (headshot_mult if _is_headshot(body) else 1.0)
 
 func _on_body_entered(body: Node) -> void:
 	if _spent or body == shooter:
@@ -76,7 +98,7 @@ func _on_body_entered(body: Node) -> void:
 		if body in _hit:
 			return
 		_hit.append(body)
-		body.request_damage(damage, attacker_id)
+		body.request_damage(_hit_damage(body), attacker_id)
 		_apply_on_hit(body)
 		return
 	# Normal: single hit (or AoE burst), then despawn.
@@ -84,7 +106,7 @@ func _on_body_entered(body: Node) -> void:
 	if aoe_radius > 0.0:
 		_burst()
 	else:
-		body.request_damage(damage, attacker_id)
+		body.request_damage(_hit_damage(body), attacker_id)
 		_apply_on_hit(body)
 	queue_free()
 

@@ -23,7 +23,7 @@ signal defeated(by_peer_id: int)
 
 const GRAVITY: float = 20.0
 const RESPAWN_DELAY: float = 5.0
-const HIT_FLASH_TIME: float = 0.05
+const HIT_FLASH_TIME: float = 0.12
 # Melee chaser tuning.
 const MOVE_SPEED: float = 4.5
 const MELEE_RANGE: float = 2.6
@@ -208,7 +208,7 @@ func _physics_process(delta: float) -> void:
 	if _hit_flash_timer > 0.0:
 		_hit_flash_timer -= delta
 		if _hit_flash_timer <= 0.0:
-			_update_color()
+			_apply_model_tint()
 
 ## Weapon hit entry point (same signature as PlayerController.request_damage).
 func request_damage(amount: float, attacker_id: int) -> void:
@@ -221,7 +221,9 @@ func request_damage(amount: float, attacker_id: int) -> void:
 		return
 	health = max(health - amount, 0.0)
 	_label.text = "%d" % int(health)
-	_material.albedo_color = Color(1.0, 1.0, 1.0)
+	# Flash the visible character model white (the placeholder _mesh is hidden).
+	if _model != null:
+		_model.set_tint(Color(1.0, 1.0, 1.0))
 	_hit_flash_timer = HIT_FLASH_TIME
 	if health <= 0.0:
 		_enter_downed()
@@ -438,3 +440,16 @@ func _ranged_attack(target: Node3D) -> void:
 
 func _update_color() -> void:
 	_material.albedo_color = Color(0.8, 0.3, 0.3)
+
+## Restore the visible model to its team colour (after a white hit-flash).
+func _apply_model_tint() -> void:
+	if _model != null:
+		_model.set_tint(CategoryColors.ALLY if team == 0 else CategoryColors.ENEMY)
+
+## Recon-dart reveal: outline the bot through walls while a dart has it in range.
+var _reveal_refs: int = 0
+
+func set_revealed(on: bool) -> void:
+	_reveal_refs = maxi(_reveal_refs + (1 if on else -1), 0)
+	if _model != null:
+		_model.set_outline(_reveal_refs > 0)
