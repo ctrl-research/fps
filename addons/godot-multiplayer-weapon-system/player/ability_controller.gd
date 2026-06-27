@@ -34,7 +34,7 @@ const ARROW_MAX_SPEED: float = 78.0
 const ARROW_MIN_DMG: float = 0.5
 const ARROW_MAX_DMG: float = 1.7
 const ARROW_GRAVITY: float = 14.0
-## Headshot bonus, applied only to archer-class projectiles.
+## Fallback headshot bonus if the archer's "headshot" passive omits a mult value.
 const ARCHER_HEADSHOT_MULT: float = 1.5
 # Recon dart (Marksman): reveal radius / duration.
 const RECON_RADIUS: float = 14.0
@@ -553,9 +553,10 @@ func _spawn_projectile(damage: float, aoe_radius: float, color: Color, speed: fl
 	proj.speed = speed
 	proj.pierce = pierce
 	proj.fall_gravity = gravity
-	# Headshots are unique to archers — only their projectiles carry the bonus.
-	if _player and _player.class_id == "archer":
-		proj.headshot_mult = ARCHER_HEADSHOT_MULT
+	# Headshots come from the archer's Eagle Eye passive (the "headshot" tag), so
+	# the bonus is unique to archers and only applies while that passive is active.
+	if _tags.has("headshot"):
+		proj.headshot_mult = float(_tags["headshot"].get("mult", ARCHER_HEADSHOT_MULT))
 	proj.attacker_id = _peer_id()
 	proj.shooter = _player
 	# Carry the caster's on-hit passives (lifesteal, slow).
