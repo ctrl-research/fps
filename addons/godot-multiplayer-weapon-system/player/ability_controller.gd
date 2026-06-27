@@ -25,6 +25,21 @@ const BOLT_DAMAGE: float = 22.0
 const BOLT_INTERVAL: float = 0.7
 const BLINK_DISTANCE: float = 9.0
 
+# Chargeable bow (archer base attack): hold to draw, release to loose. The shot
+# is ballistic (arcs/drops); charge scales its launch speed (flatter, longer)
+# and its damage.
+const ARROW_CHARGE_TIME: float = 0.9
+const ARROW_MIN_SPEED: float = 32.0
+const ARROW_MAX_SPEED: float = 78.0
+const ARROW_MIN_DMG: float = 0.5
+const ARROW_MAX_DMG: float = 1.7
+const ARROW_GRAVITY: float = 14.0
+## Headshot bonus, applied only to archer-class projectiles.
+const ARCHER_HEADSHOT_MULT: float = 1.5
+# Recon dart (Marksman): reveal radius / duration.
+const RECON_RADIUS: float = 14.0
+const RECON_TIME: float = 3.0
+
 ## ability id -> {slot, cooldown}. slot maps to an input action below; "attack"
 ## abilities also use "interval" (their base swing/cast time).
 const ABILITY_DEFS: Dictionary = {
@@ -38,6 +53,7 @@ const ABILITY_DEFS: Dictionary = {
 	"fireball": {"slot": "ability1", "cooldown": 6.0},
 	"frost_nova": {"slot": "ability1", "cooldown": 7.0},
 	"power_shot": {"slot": "ability1", "cooldown": 6.0},
+	"recon_dart": {"slot": "ability1", "cooldown": 8.0},
 	"multishot": {"slot": "ability1", "cooldown": 7.0},
 	"immovable": {"slot": "ult", "cooldown": 40.0, "duration": 5.0},
 	"berserk": {"slot": "ult", "cooldown": 45.0, "duration": 6.0},
@@ -63,6 +79,11 @@ var _tags: Dictionary = {}
 var _cooldowns: Dictionary = {}  # ability id -> remaining cooldown seconds
 var _durations: Dictionary = {}  # ability id -> remaining ACTIVE seconds (cooldown starts when this hits 0)
 var _attack_cd: float = 0.0
+
+# Chargeable-bow state (local archer only).
+var _charging: bool = false
+var _charge: float = 0.0
+var _traj: MeshInstance3D = null   # world-space trajectory preview line
 
 # Berserk capstone window (seconds remaining) + AoE tick accumulator.
 var _berserk_time: float = 0.0
@@ -123,26 +144,132 @@ func _process(delta: float) -> void:
 			_aoe_damage(_player.global_position, 3.0, MELEE_DAMAGE * 0.4 * _damage_mult())
 			_player.heal(6.0)
 	if _is_local:
-		_handle_input()
+		_handle_input(delta)
 
 # === Input ===
 
-func _handle_input() -> void:
+func _handle_input(delta: float) -> void:
 	if Input.get_mouse_mode() != Input.MOUSE_MODE_CAPTURED:
+		_cancel_charge()
 		return
 	if _player and (_player.is_dead or _player.is_downed or _player.is_stunned()):
+		_cancel_charge()
 		return
 	for id in _abilities:
 		var def: Dictionary = ABILITY_DEFS.get(id, {})
-		var action: String = SLOT_ACTION.get(def.get("slot", ""), "")
+		var slot: String = def.get("slot", "")
+		var action: String = SLOT_ACTION.get(slot, "")
 		if action == "":
 			continue
-		# The primary attack fires continuously while held (gated by the attack
-		# interval); other abilities trigger on the initial press only.
-		var triggered := Input.is_action_pressed(action) if def.get("slot", "") == "attack" else Input.is_action_just_pressed(action)
-		if not triggered:
+		# Archer's bow charges on hold and looses on release (see below).
+		if slot == "attack" and id == "arrow":
+			_handle_charge_bow(def, action, delta)
 			continue
-		_try_cast(id, def)
+		# Other primary attacks fire continuously while held (gated by the attack
+		# interval); abilities trigger on the initial press only.
+		var triggered := Input.is_action_pressed(action) if slot == "attack" else Input.is_action_just_pressed(action)
+		if triggered:
+			_try_cast(id, def)
+
+## Hold to draw the bow, release to loose a ballistic arrow whose speed and damage
+## scale with the charge. While drawing, optionally preview the arc.
+func _handle_charge_bow(def: Dictionary, action: String, delta: float) -> void:
+	if Input.is_action_just_pressed(action) and _attack_cd <= 0.0:
+		_charging = true
+		_charge = 0.0
+	if not _charging:
+		return
+	if Input.is_action_pressed(action):
+		_charge = minf(_charge + delta, ARROW_CHARGE_TIME)
+		_draw_bow_visual(_charge / ARROW_CHARGE_TIME)
+		_update_trajectory_preview()
+	if Input.is_action_just_released(action):
+		_loose_arrow(def)
+
+func _loose_arrow(def: Dictionary) -> void:
+	var t := _charge / ARROW_CHARGE_TIME
+	_charging = false
+	_charge = 0.0
+	_hide_trajectory_preview()
+	_release()
+	var speed := lerpf(ARROW_MIN_SPEED, ARROW_MAX_SPEED, t)
+	var dmg := BOLT_DAMAGE * lerpf(ARROW_MIN_DMG, ARROW_MAX_DMG, t) * _damage_mult()
+	_spawn_projectile(dmg, 0.0, Color(0.85, 0.78, 0.55), speed, _tags.has("pierce"), Vector3.ZERO, ARROW_GRAVITY)
+	_attack_cd = float(def.get("interval", 0.5)) * _fire_rate_mult()
+
+func _cancel_charge() -> void:
+	if _charging:
+		_charging = false
+		_charge = 0.0
+		_hide_trajectory_preview()
+		if _sword != null:
+			_sword.transform = _sword_rest
+
+## Pull the bow back proportional to the charge (visual feedback).
+func _draw_bow_visual(t: float) -> void:
+	if _sword == null:
+		return
+	if _swing_tween and _swing_tween.is_valid():
+		_swing_tween.kill()
+	_sword.transform = _sword_rest.translated_local(Vector3(0.0, 0.0, 0.08 * t))
+
+# === Trajectory preview (archer charge) ===
+
+## Simulate the charged arrow's ballistic arc and draw it as a world-space line,
+## stopping at the first surface it would hit. Gated by the Settings toggle.
+func _update_trajectory_preview() -> void:
+	if not Settings.preview_arrow_trajectory or _camera == null or _player == null:
+		_hide_trajectory_preview()
+		return
+	if _traj == null:
+		_build_trajectory_node()
+	_traj.visible = true
+	var t := _charge / ARROW_CHARGE_TIME
+	var speed := lerpf(ARROW_MIN_SPEED, ARROW_MAX_SPEED, t)
+	var forward := -_camera.global_transform.basis.z
+	var pos := _camera.global_position + forward * 0.8
+	var vel := forward * speed
+	var space := _player.get_world_3d().direct_space_state
+	var step := 0.04
+	var pts := PackedVector3Array([pos])
+	for i in 100:
+		var next := pos + vel * step
+		vel.y -= ARROW_GRAVITY * step
+		var q := PhysicsRayQueryParameters3D.create(pos, next)
+		q.collision_mask = 1
+		q.exclude = [_player.get_rid()]
+		var hit := space.intersect_ray(q)
+		if not hit.is_empty():
+			pts.append(hit.get("position"))
+			break
+		pos = next
+		pts.append(pos)
+	var im: ImmediateMesh = _traj.mesh
+	im.clear_surfaces()
+	im.surface_begin(Mesh.PRIMITIVE_LINE_STRIP)
+	for p in pts:
+		im.surface_add_vertex(p)
+	im.surface_end()
+
+func _build_trajectory_node() -> void:
+	_traj = MeshInstance3D.new()
+	_traj.mesh = ImmediateMesh.new()
+	_traj.top_level = true   # vertices are authored in world space
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(1.0, 0.95, 0.6, 0.9)
+	mat.no_depth_test = true
+	_traj.material_override = mat
+	var world := _player.get_parent() if _player else get_tree().current_scene
+	world.add_child(_traj)
+
+func _hide_trajectory_preview() -> void:
+	if _traj != null:
+		_traj.visible = false
+
+func _exit_tree() -> void:
+	if is_instance_valid(_traj):
+		_traj.queue_free()
 
 func _try_cast(id: String, def: Dictionary) -> void:
 	# Primary attack (melee swing / magic bolt) — gated by the attack interval.
@@ -210,6 +337,7 @@ func _cast(id: String) -> void:
 		"fireball": _do_fireball()
 		"frost_nova": _do_frost_nova()
 		"power_shot": _do_power_shot()
+		"recon_dart": _do_recon_dart()
 		"multishot": _do_multishot()
 		"immovable": _do_immovable()
 		"berserk": _do_berserk()
@@ -371,6 +499,23 @@ func _do_power_shot() -> void:
 	_release()
 	_spawn_projectile(MELEE_DAMAGE * 1.6 * _damage_mult(), 0.0, Color(1.0, 0.9, 0.4), 70.0, true)
 
+## Recon Dart (Marksman 5): a no-damage arrow that sticks on impact and outlines
+## enemies through walls within a radius for a few seconds (while they stay in it).
+func _do_recon_dart() -> void:
+	_release()
+	if _camera == null:
+		return
+	var forward := -_camera.global_transform.basis.z
+	var dart := ReconDart.new()
+	dart.attacker_id = _peer_id()
+	dart.shooter = _player
+	dart.shooter_team = _player.team if _player else -1
+	dart.reveal_radius = RECON_RADIUS
+	dart.reveal_time = RECON_TIME
+	var world := _player.get_parent() if _player else get_tree().current_scene
+	world.add_child(dart)
+	dart.launch(_camera.global_position + forward * 0.8, forward)
+
 ## Snipe (Marksman capstone): a massive piercing arrow.
 func _do_snipe() -> void:
 	_release()
@@ -393,9 +538,10 @@ func _do_arrow_storm() -> void:
 	_aoe_damage(target, 6.0, MELEE_DAMAGE * 2.0 * _damage_mult())
 	_aoe_slow(target, 6.0, 1.5, 2.0)
 
-## Spawn a MagicProjectile from the camera. `dir` defaults to the aim direction.
+## Spawn a MagicProjectile from the camera. `dir` defaults to the aim direction;
+## `gravity` > 0 makes it ballistic (the charged bow).
 func _spawn_projectile(damage: float, aoe_radius: float, color: Color, speed: float,
-		pierce: bool = false, dir: Vector3 = Vector3.ZERO) -> void:
+		pierce: bool = false, dir: Vector3 = Vector3.ZERO, gravity: float = 0.0) -> void:
 	if _camera == null:
 		return
 	var forward := -_camera.global_transform.basis.z
@@ -406,6 +552,10 @@ func _spawn_projectile(damage: float, aoe_radius: float, color: Color, speed: fl
 	proj.color = color
 	proj.speed = speed
 	proj.pierce = pierce
+	proj.fall_gravity = gravity
+	# Headshots are unique to archers — only their projectiles carry the bonus.
+	if _player and _player.class_id == "archer":
+		proj.headshot_mult = ARCHER_HEADSHOT_MULT
 	proj.attacker_id = _peer_id()
 	proj.shooter = _player
 	# Carry the caster's on-hit passives (lifesteal, slow).

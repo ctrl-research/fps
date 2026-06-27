@@ -77,6 +77,7 @@ func _build_ui() -> void:
 	var gp := _make_tab(tabs, "Gameplay")
 	gp.add_child(_make_toggle_row("Rotate minimap with view", Settings.minimap_rotates, Settings.set_minimap_rotates))
 	gp.add_child(_make_toggle_row("Auto-run (sprint by default)", Settings.auto_run, Settings.set_auto_run))
+	gp.add_child(_make_toggle_row("Preview arrow trajectory (archer)", Settings.preview_arrow_trajectory, Settings.set_preview_arrow_trajectory))
 	gp.add_child(_make_option_row("Crosshair", Settings.CROSSHAIR_STYLES, Settings.crosshair_style, Settings.set_crosshair_style))
 
 	# --- Controls ---

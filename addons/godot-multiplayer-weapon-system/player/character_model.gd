@@ -112,14 +112,44 @@ func set_visual_layer(mask: int) -> void:
 		mesh.layers = mask
 
 ## Recolour the whole model to a flat category base colour (still lit, so the
-## comic shader bands it). Used for ally/enemy readability.
+## comic shader bands it). Used for ally/enemy readability and the hit flash.
 func set_tint(color: Color) -> void:
+	_tint = color
+	_reapply()
+
+## Toggle an ESP-style outline that is visible through walls (recon-dart reveal).
+## Implemented as an inverted-hull next_pass so it works on the skinned meshes and
+## survives tint changes (the hit flash recolours via set_tint).
+func set_outline(on: bool, color: Color = Color(1.0, 0.85, 0.2)) -> void:
+	_outline_on = on
+	_outline_color = color
+	_reapply()
+
+# Current visual state, reapplied together so a tint change keeps the outline.
+var _tint: Color = Color(1, 1, 1)
+var _outline_on: bool = false
+var _outline_color: Color = Color(1.0, 0.85, 0.2)
+
+func _reapply() -> void:
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = color
+	mat.albedo_color = _tint
 	mat.roughness = 0.9
 	mat.metallic = 0.0
+	if _outline_on:
+		mat.next_pass = _build_outline_material()
 	for mesh in _meshes():
 		mesh.material_override = mat
+
+func _build_outline_material() -> StandardMaterial3D:
+	var o := StandardMaterial3D.new()
+	o.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	o.albedo_color = _outline_color
+	o.cull_mode = BaseMaterial3D.CULL_FRONT   # render back faces, grown outward -> a silhouette
+	o.grow = true
+	o.grow_amount = 0.04
+	o.no_depth_test = true                     # draw over walls so the outline shows through
+	o.render_priority = 2
+	return o
 
 func meshes() -> Array:
 	return _meshes()

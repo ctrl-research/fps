@@ -338,6 +338,33 @@ func _apply_team_tint() -> void:
 	var my_team := GameState._get_player_team(authority_peer_id)
 	_model.set_tint(CategoryColors.ALLY if my_team == local_team else CategoryColors.ENEMY)
 
+## Briefly flash the body white when hit, on every peer's copy. Called by the
+## owner from _apply_damage; the RPC mirrors it on remote peers.
+const HIT_FLASH_TIME: float = 0.12
+
+func _flash_hit() -> void:
+	if _model == null:
+		return
+	_model.set_tint(Color(1, 1, 1))
+	get_tree().create_timer(HIT_FLASH_TIME).timeout.connect(_restore_tint)
+
+func _restore_tint() -> void:
+	if is_instance_valid(self):
+		_apply_team_tint()
+
+@rpc("any_peer", "call_remote", "unreliable")
+func _flash_hit_remote() -> void:
+	_flash_hit()
+
+## Recon-dart reveal: outline the body through walls while at least one dart has
+## it in range. Refcounted so overlapping darts compose correctly.
+var _reveal_refs: int = 0
+
+func set_revealed(on: bool) -> void:
+	_reveal_refs = maxi(_reveal_refs + (1 if on else -1), 0)
+	if _model != null:
+		_model.set_outline(_reveal_refs > 0)
+
 func _input(event: InputEvent) -> void:
 	# Only look around while the cursor is captured. Overlays such as the buy menu
 	# release the cursor, which must suppress camera look without spinning the view.
@@ -699,6 +726,10 @@ func _apply_damage(amount: float, attacker_id: int) -> void:
 	health = max(health - taken, 0.0)
 	health_changed.emit(health, max_health)
 	_broadcast_health()
+	# White hit-flash, shown on every peer's copy of this body.
+	_flash_hit()
+	if multiplayer.multiplayer_peer != null:
+		_flash_hit_remote.rpc()
 	if health <= 0.0:
 		_enter_downed()
 

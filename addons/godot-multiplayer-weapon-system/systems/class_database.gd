@@ -153,7 +153,7 @@ static func _archer() -> Dictionary:
 					{"id": "piercing_tips", "name": "Piercing Tips", "desc": "Your arrows pierce enemies", "icon": "PRC", "tags": ["pierce"]},
 					{"id": "deadeye", "name": "Deadeye", "desc": "+15% attack speed", "icon": "AS", "stats": {"fire_rate": 0.85}},
 					{"id": "hunters_mark", "name": "Hunter's Mark", "desc": "Arrows heal you (lifesteal)", "icon": "LS", "tags": ["lifesteal"], "values": {"lifesteal": 0.12}},
-					{"id": "power_shot", "name": "Power Shot", "desc": "Ability: a high-damage piercing arrow", "icon": "PWR", "grants": ["power_shot"]},
+					{"id": "recon_dart", "name": "Recon Dart", "desc": "Ability: sticks on impact and outlines nearby enemies through walls for 3s", "icon": "RCN", "grants": ["recon_dart"]},
 					{"id": "lethality", "name": "Lethality", "desc": "+20% damage", "icon": "DM+", "stats": {"damage": 1.20}},
 					{"id": "focus", "name": "Focus", "desc": "+15% damage", "icon": "DM2", "stats": {"damage": 1.15}},
 					{"id": "snipe", "name": "Snipe", "desc": "CAPSTONE: a massive piercing arrow", "icon": "★", "grants": ["snipe"]},
