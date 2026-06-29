@@ -141,9 +141,10 @@ static func _archer() -> Dictionary:
 		"base_abilities": ["arrow", "dash"],
 		"passive": {
 			"name": "Eagle Eye",
-			"desc": "+10% damage and +10% attack speed",
+			"desc": "Headshots deal +50% damage (archer only)",
 			"icon": "EYE",
-			"stats": {"damage": 1.10, "fire_rate": 0.9},
+			"tags": ["headshot"],
+			"values": {"mult": 1.5},
 		},
 		"paths": [
 			{
