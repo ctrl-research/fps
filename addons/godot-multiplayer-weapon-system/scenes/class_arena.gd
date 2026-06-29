@@ -73,7 +73,10 @@ func _exit_tree() -> void:
 	GameState.match_over = false
 
 func _process(delta: float) -> void:
-	if _phase != Phase.LIVE and Input.get_mouse_mode() != Input.MOUSE_MODE_VISIBLE:
+	# Free the cursor for the menu phases, but keep it captured through the PRE
+	# countdown (and LIVE) so the player can look around the instant the round
+	# starts — no click needed to engage pointer lock.
+	if _phase != Phase.LIVE and _phase != Phase.PRE and Input.get_mouse_mode() != Input.MOUSE_MODE_VISIBLE:
 		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	match _phase:
 		Phase.LIVE:
@@ -165,6 +168,11 @@ func _enter_pre() -> void:
 	_phase = Phase.PRE
 	_timer = PRE_SECS
 	_countdown_label.visible = true
+	_set_combat_active(false)   # frozen during the countdown
+	# Capture here: _enter_pre runs inside the class/spec click handler, so this
+	# counts as the user gesture browsers require to grant pointer lock, and it
+	# stays held into LIVE (fixes round 1 needing a click before you can look).
+	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _begin_live() -> void:
 	_phase = Phase.LIVE
